@@ -1,0 +1,33 @@
+1 Downloading
+curl -H "X-Auth-Token: $token" 'https://gdc-api.nci.nih.gov/data/e8721d17-d791-4d42-ba05-baa4ca68740f' >TCGA-29-1766-01A.DNA.ctrl.bam
+curl -H "X-Auth-Token: $token" 'https://gdc-api.nci.nih.gov/data/11684852-bad0-4241-8e89-2d35db60b237' >TCGA-29-1766-01A.DNA.case.bam
+curl -H "X-Auth-Token: $token" 'https://gdc-api.nci.nih.gov/data/f1c1a6b3-830a-4719-96af-c89291b27c3b' >TCGA-29-1766-01A.RNA.case.bam
+2. Converting to fastq
+#WRONG!!!!! secondary alignments will be take as reads as well. Causing same head multiple reads problem for Picard (MarkDuplicates) 
+samtools sort -n aln.bam aln.qsort
+#
+$ bedtools bamtofastq -i aln.qsort.bam \
+                      -fq aln.end1.fq \
+                      -fq2 aln.end2.fq
+
+
+3. HLA typing
+# HLA type 1 is fine. Do we need type 2? Usually gives ambiguious results.
+
+4. Mapping 
+# Mutect2 is slow and relatively low sensitivity until GATK 4. (before I figure out scatter gather parallelism.) nct will lead to non-deterministic result.
+# MuSE need to download
+# VarScan 2 gives most result and highest sensitivity for non-low-frequent alleles.
+
+Fastq2Mut:
+Memory: bwa 15G, multiprocessing/threading; picard sort 22G,merge 2G, markDuplicates 46G, multiprocess&threading; varscan, 3G
+
+bam-readcount -f ~/nobackup-yxing/STAR.reference/Homo_sapiens.GRCh38.dna_sm.primary_assembly.fa -w 1 -l ~/NeoEpitope/varscan.positions Aligned.sortedByCoord.out.bam>~/NeoEpitope/RNA.readcount
+
+5. Expression
+snp coverage: STAR - bam-readcount
+gene/iso quant: STAR - cufflinks
+junction search: STAR2pass
+
+6. Note
+
