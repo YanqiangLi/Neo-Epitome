@@ -274,13 +274,13 @@ def main():
     args = parser.parse_args()
 
     fin=args.vcf_input
-    outdir=args.outdir.strip('/')
-    os.system('mkdir -p '+outdir)
     epitope_len_list=args.epitope_len_list.split(',')
     if min(epitope_len_list)<8:
         sys.exit("# The request epitope length is too small. Exit.")
     hla_allele_list=args.hla_allele_list.split(',')
-
+    outdir=args.outdir.strip('/')
+    os.system('mkdir -p '+outdir)
+    
     print str(now),'# Searching Neoepitopes for allele types',','.join(hla_allele_list), 'with ', ','.join(epitope_len_list),'long...'
     
     # Step 1. Predicting the Neo-epitope by HLA binding affinity. Generating TSV and FASTA files. 
