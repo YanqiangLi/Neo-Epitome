@@ -260,7 +260,7 @@ def main():
     parser.add_argument('vcf_input', help='input annotated somatic mutation VCF file.')
     parser.add_argument('-j', '--junction-input', help='input of somatic junctions file.')
     parser.add_argument('-e', '--epitope-len-list', default='8,9,10', help='epitope length for prediction. Default is 8,9,10.')
-    parser.add_argument('-a', '--hla-allele-list', default='HLA-A*01:01,HLA-B*01:01', help='a list of HLA types. Default is HLA-A*01:01,HLA-B*01:01.')
+    parser.add_argument('-a', '--hla-allele-list', default='HLA-A*01:01,HLA-B*07:02', help='a list of HLA types. Default is HLA-A*01:01,HLA-B*01:01.')
     parser.add_argument('--step', default=100, help='Number of entries per time sending to prediction. Default is 50.')
     parser.add_argument('--ic50-cut-off', default=1000, help='Cut-off based on median value of concensus predicted IC50 values. Default is 1000.')
     parser.add_argument('-o', '--outdir', default= 'Result.'+ID, help='The output directory.')
@@ -284,7 +284,7 @@ def main():
     print str(now),'# Searching Neoepitopes for allele types',','.join(hla_allele_list), 'with ', ','.join(epitope_len_list),'long...'
     
     # Step 1. Predicting the Neo-epitope by HLA binding affinity. Generating TSV and FASTA files. 
-    #mutationPipeline(fin, hla_allele_list, epitope_len_list, int(args.step), args.ic50_cut_off, outdir)
+    mutationPipeline(fin, hla_allele_list, epitope_len_list, int(args.step), args.ic50_cut_off, outdir)
     print str(now),'# Finished searching and predicting. The result is saved as: '+outdir+'/'+fin.split('/')[-1]+'.step1.out \n'
 
     # Step 2 (Optional). Confirming with coverage and epxression level information. Appending to TSV.
