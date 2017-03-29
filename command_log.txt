@@ -5,11 +5,6 @@ curl -H "X-Auth-Token: $token" 'https://gdc-api.nci.nih.gov/data/f1c1a6b3-830a-4
 2. Converting to fastq
 #WRONG!!!!! secondary alignments will be take as reads as well. Causing same head multiple reads problem for Picard (MarkDuplicates) 
 samtools sort -n aln.bam aln.qsort
-#
-$ bedtools bamtofastq -i aln.qsort.bam \
-                      -fq aln.end1.fq \
-                      -fq2 aln.end2.fq
-
 
 3. HLA typing
 # HLA type 1 is fine. Do we need type 2? Usually gives ambiguious results.
@@ -22,12 +17,15 @@ $ bedtools bamtofastq -i aln.qsort.bam \
 Fastq2Mut:
 Memory: bwa 15G, multiprocessing/threading; picard sort 22G,merge 2G, markDuplicates 46G, multiprocess&threading; varscan, 3G
 
+
 bam-readcount -f ~/nobackup-yxing/STAR.reference/Homo_sapiens.GRCh38.dna_sm.primary_assembly.fa -w 1 -l ~/NeoEpitope/varscan.positions Aligned.sortedByCoord.out.bam>~/NeoEpitope/RNA.readcount
 
 5. Expression
-snp coverage: STAR - bam-readcount
-gene/iso quant: STAR - cufflinks
+snp coverage: STAR2pass - bam-readcount
+gene/iso quant: STAR2pass - cufflinks
 junction search: STAR2pass
+
+STAR 35G multithreading, cufflinks 1G,
 
 6. Note
 
