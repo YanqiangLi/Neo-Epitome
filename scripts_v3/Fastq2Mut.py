@@ -44,7 +44,7 @@ parser.add_argument('readsFilesCase',help='Tumor sample paired-end fastq files s
 parser.add_argument('readsFilesCtrl', help='Tumor sample paired-end fastq files seperated by ",".')
 parser.add_argument('-d','--binDir', help='Directory for java applications indluding GATK, picard.')
 parser.add_argument('-p','--sampleID', default='NeoEpitomeOut', help='Sample ID will be used for output folder name and reads group name.')
-
+#parser.add_argument('-o', '--outdir', default= 'Result.'+ID, help='The output directory.')
 
 args = parser.parse_args()
 sampleID=args.sampleID
