@@ -45,9 +45,9 @@ def main():
 
 	args = parser.parse_args()
 	os.system('mkdir -p '+args.sampleID)
-	sampleID = args.sampleID.strip('/')
+	sampleID = args.sampleID.rstrip('/')
 	runname = sampleID+'/hla_types'
-	bindir = '/u/home/p/panyang/NeoEpitope/bin/seq2hla/'
+	bindir = '/u/home/p/panyang/Neo-Epitome/bin/seq2hla/'
 	logging.basicConfig(level=logging.DEBUG,
 	                    format='%(asctime)s %(message)s',
 	                    filename=sampleID+'/NeoEpitome-seq2HLA.log'+ str(datetime.datetime.now())+'.txt' ,
