@@ -51,3 +51,5 @@ if os.path.exists(sampleID+'/cufflinks/genes.fpkm_tracking')==False:
 else:
 	logging.debug('[RNA-seq] # Skipped cufflinks.')
 	print '[RNA-seq] # Skipped cufflinks.'
+logging.debug('[RNA-seq] # Completed.')
+print '[RNA-seq] # Completed.'

@@ -1,10 +1,10 @@
 import sys, os, csv, argparse, logging, datetime
 
 
-def seq2HLA(readsFilesCaseRNA,runname):
+def seq2HLA(readsFilesCaseRNA,runname,bindir):
 	readsFiles_split=readsFilesCaseRNA.split(',')
 	os.system('mkdir -p '+runname)
-	cmd = 'python bin/seq2hla/seq2HLA.py -1 '+readsFiles_split[0]+' -2 '+readsFiles_split[1]+' -r '+runname
+	cmd = 'python '+bindir+'seq2HLA.py -1 '+readsFiles_split[0]+' -2 '+readsFiles_split[1]+' -r '+runname
 	logging.debug('[seq2hla] Running command 1:'+cmd)
 	os.system (cmd)
 
@@ -47,7 +47,7 @@ def main():
 	os.system('mkdir -p '+args.sampleID)
 	sampleID = args.sampleID.strip('/')
 	runname = sampleID+'/hla_types'
-
+	bindir = '/u/home/p/panyang/NeoEpitope/bin/seq2hla/'
 	logging.basicConfig(level=logging.DEBUG,
 	                    format='%(asctime)s %(message)s',
 	                    filename=sampleID+'/NeoEpitome-seq2HLA.log'+ str(datetime.datetime.now())+'.txt' ,
@@ -56,7 +56,7 @@ def main():
 	logging.debug('[seq2hla] # Start seq2HLA.')
 	print '[seq2hla] # Start seq2HLA.'
 
-	hla=seq2HLA(args.readsFilesCaseRNA, runname)
+	hla=seq2HLA(args.readsFilesCaseRNA, runname, bindir)
 
 	print '[seq2hla] # Completed. HLA types: '+hla
 	logging.debug('[seq2hla] # Completed. HLA types: '+hla)
