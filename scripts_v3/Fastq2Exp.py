@@ -23,7 +23,7 @@ parser.add_argument('readsFilesCaseRNA',help='Tumor sample paired-end fastq file
 
 args = parser.parse_args()
 
-sampleID=args.sampleID.strip('/')
+sampleID=args.sampleID.rstrip('/')
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(message)s',
