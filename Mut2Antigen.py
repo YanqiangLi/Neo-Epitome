@@ -65,7 +65,8 @@ def mhcPredType(mhc_type_dict, hla_allele):
     else:
         return 'mhcii'
         
-def seqPred(prot_seq,hla_allele_list,epitope_len_list, mhc_type_dict):
+def seqPred(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict):
+	prot_seq= '%0A'.join('%3Epredict'+str(i)+'%0A'+seq for i,seq in enumerate(prot_seq_list))
     stdout_total=[]
     for hla_allele in hla_allele_list:
         cmd = 'curl --data method=recommended&sequence_text='+prot_seq+'&allele='+','.join([hla_allele]*len(epitope_len_list))+'&length='+','.join(epitope_len_list)+' http://tools-cluster-interface.iedb.org/tools_api/'+mhcPredType(mhc_type_dict, hla_allele)+'/'
@@ -168,10 +169,8 @@ def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off,
             ref_seq+=[prot_seq_ref[-1][start_pos[-1]:end_pos]]
 
         if len(dna_pos)==step or file_index==fin_len-1:
-            mut_seq_list= '%0A'.join('%3Epredict'+str(i)+'%0A'+seq for i,seq in enumerate(mut_seq))
-            ref_seq_list= '%0A'.join('%3Epredict'+str(i)+'%0A'+seq for i,seq in enumerate(ref_seq))
-            pred_result_mut=seqPred(mut_seq_list, hla_allele_list, epitope_len_list, mhc_type_dict)
-            pred_result_ref=seqPred(ref_seq_list, hla_allele_list, epitope_len_list, mhc_type_dict)
+            pred_result_mut=seqPred(mut_seq, hla_allele_list, epitope_len_list, mhc_type_dict)
+            pred_result_ref=seqPred(ref_seq, hla_allele_list, epitope_len_list, mhc_type_dict)
             for i,pred_allele_result_mut in enumerate(pred_result_mut):
                 for k in pred_allele_result_mut:
                     foc=pred_allele_result_mut[k]/pred_result_ref[i][k]
@@ -291,7 +290,7 @@ def main():
     if min(epitope_len_list)<8:
         sys.exit("# The request epitope length is too small. Exit.")
     if args.iedb!=False:
-    	iedb_path=args.iedb
+    	iedb_path=args.iedb.rstrip('/')
     hla_allele_list=args.hla_allele_list.split(',')
     outdir=args.outdir.strip('/')
     os.system('mkdir -p '+outdir)
