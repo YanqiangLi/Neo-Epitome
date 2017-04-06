@@ -75,6 +75,18 @@ def seqPred(prot_seq,hla_allele_list,epitope_len_list, mhc_type_dict):
         stdout_total+=[stdout]
         
     return [parsePred(item) for item in stdout_total]
+'''
+def seqPred_local(prot_seq,hla_allele_list,epitope_len_list, mhc_type_dict):
+    stdout_total=[]
+    for hla_allele in hla_allele_list:
+        cmd = 'curl --data method=recommended&sequence_text='+prot_seq+'&allele='+','.join([hla_allele]*len(epitope_len_list))+'&length='+','.join(epitope_len_list)+' http://tools-cluster-interface.iedb.org/tools_api/'+mhcPredType(mhc_type_dict, hla_allele)+'/'
+        args = cmd.split()
+        process = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+        stdout_total+=[stdout]
+        
+    return [parsePred(item) for item in stdout_total]
+'''
 
 def parsePred(stdout):
     ref_dict={}
@@ -261,6 +273,7 @@ def main():
     parser.add_argument('-j', '--junction-input', help='input of somatic junctions file.')
     parser.add_argument('-e', '--epitope-len-list', default='8,9,10', help='epitope length for prediction. Default is 8,9,10.')
     parser.add_argument('-a', '--hla-allele-list', default='HLA-A*01:01,HLA-B*07:02', help='a list of HLA types. Default is HLA-A*01:01,HLA-B*01:01.')
+    parser.add_argument('--iedb', default=False, help='Specify local IEDB location if it is installed.')
     parser.add_argument('--step', default=100, help='Number of entries per time sending to prediction. Default is 50.')
     parser.add_argument('--ic50-cut-off', default=1000, help='Cut-off based on median value of concensus predicted IC50 values. Default is 1000.')
     parser.add_argument('-o', '--outdir', default= 'Result.'+ID, help='The output directory.')
@@ -277,9 +290,12 @@ def main():
     epitope_len_list=args.epitope_len_list.split(',')
     if min(epitope_len_list)<8:
         sys.exit("# The request epitope length is too small. Exit.")
+    if args.iedb!=False:
+    	iedb_path=args.iedb
     hla_allele_list=args.hla_allele_list.split(',')
     outdir=args.outdir.strip('/')
     os.system('mkdir -p '+outdir)
+
     
     print str(now),'# Searching Neoepitopes for allele types',','.join(hla_allele_list), 'with ', ','.join(epitope_len_list),'long...'
     
