@@ -100,7 +100,7 @@ def parsePred(stdout):
         ic50=[k for k in r.keys() if k.find('ic50')!=-1]
         p = re.compile('\d+(\.\d+)?')
         ic50_value=[float(r[k]) for k in ic50 if p.match(r[k]) != None]
-        ref_dict[r['allele']+'_'+r['seq_num']+'_'+r['start']+'_'+r['length']]=numpy.median(ic50_value)
+        ref_dict[r['allele']+'_'+r['seq_num']+'_'+r['start']+'_'+r['length']]=[numpy.median(ic50_value),r['peptide']]
     return ref_dict
 
 def mergePeps2Database(fastafile, reference, outdir): 
@@ -123,7 +123,7 @@ def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off,
     fin_len=fileLen(fin)
     peptide_len = max(map(int,epitope_len_list))
     fout=open(outdir+'/'+fin.split('/')[-1]+'.step1.out','w')
-    fout.write('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format('GenomicLocation','GenomicMut','GeneName','GeneAC','TranscriptAC','ProteinAC','ProteinPos','ProteinVar','PeptideStartPos','EpitopeLength','HLAAllele','RefPredScore','MutPredScore','FoC','MutSeq'))
+    fout.write(('{}\t'*15+'{}\n').format('GenomicLocation','GenomicMut','GeneName','GeneAC','TranscriptAC','ProteinAC','ProteinPos','ProteinVar','PeptideStartPos','EpitopeLength','HLAAllele','RefPredScore','MutPredScore','FoC','MutSeq','EpitopeSeq'))
     fout_seq=open(outdir+'/'+fin.split('/')[-1]+'.step1.out.fa','w')
     seq_num,dna_pos,dna_var,gene_name,gene_ac,trnscrpt_ac,prot_ac,prot_pos,prot_var,prot_seq_ref,prot_seq_mut,start_pos,mut_seq,ref_seq=([] for i in range(14))
     mhc_type_dict=loadMHCType()
@@ -181,13 +181,13 @@ def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off,
                 pred_result_ref=seqPred(ref_seq, hla_allele_list, epitope_len_list, mhc_type_dict)
             for i,pred_allele_result_mut in enumerate(pred_result_mut):
                 for k in pred_allele_result_mut:
-                    foc=pred_allele_result_mut[k]/pred_result_ref[i][k]
+                    foc=pred_allele_result_mut[k][0]/pred_result_ref[i][k][0]
                     ks=k.split('_')
                     seq_index=int(ks[1])-1
                     start_pos_seq=int(start_pos[seq_index])+int(ks[2])
                     allele=ks[0]
                     epitope_len=ks[3]
-                    fout.write('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n'.format(dna_pos[seq_index],dna_var[seq_index],gene_name[seq_index],gene_ac[seq_index],trnscrpt_ac[seq_index],prot_ac[seq_index],prot_pos[seq_index],prot_var[seq_index],start_pos_seq,epitope_len,allele,pred_result_ref[i][k],pred_allele_result_mut[k],foc,mut_seq[seq_index]))
+                    fout.write(('{}\t'*15+'{}\n').format(dna_pos[seq_index],dna_var[seq_index],gene_name[seq_index],gene_ac[seq_index],trnscrpt_ac[seq_index],prot_ac[seq_index],prot_pos[seq_index],prot_var[seq_index],start_pos_seq,epitope_len,allele,pred_result_ref[i][k],pred_allele_result_mut[k],foc,mut_seq[seq_index],pred_allele_result_mut[k][1]))
                     if pred_allele_result_mut[k]>int(ic50_cut_off):
                     	continue
                     fout_seq.write('>{}\n{}\n'.format(dna_pos[seq_index]+'_'+dna_var[seq_index]+'_'+gene_name[seq_index]+'_'+prot_ac[seq_index]+'_'+str(prot_pos[seq_index])+'_'+prot_var[seq_index]+'_'+str(epitope_len)+'_'+allele,prot_seq_mut[seq_index])) #FASTA with full length mutant protein sequences, let the library search algorithm to remove duplicated fragments.
