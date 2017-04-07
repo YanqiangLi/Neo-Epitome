@@ -84,13 +84,14 @@ def seqPred_local(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict,
 		fout.write('>seq\n'+seq+'\n')
 	fout.close()
 	for hla_allele in hla_allele_list:
-		for epitope_len in epitope_len_list.split(','):
-			cmd = 'python '+iedb_path+'/predict_binding.py IEDB_recommended '+hla_allele+' '+epitope_len+' /u/home/p/panyang/Neo-Epitome/tmp.fasta'
+		for epitope_len in epitope_len_list:
+			cmd = 'python '+iedb_path+'/predict_binding.py IEDB_recommended '+hla_allele+' '+epitope_len+' tmp.fasta'
+			print cmd
 			args = cmd.split()
-			print args
 			process=subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 			stdout, stderr = process.communicate()
 			stdout_total+=[stdout]
+			
 	return [parsePred(item) for item in stdout_total]
 
 def parsePred(stdout):
