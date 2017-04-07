@@ -76,18 +76,22 @@ def seqPred(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict):
         stdout_total+=[stdout]
         
     return [parsePred(item) for item in stdout_total]
-'''
-def seqPred_local(prot_seq,hla_allele_list,epitope_len_list, mhc_type_dict):
+
+def seqPred_local(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict, iedb_path):
     stdout_total=[]
+    fout=open('tmp.fasta','w')
+    for seq in prot_seq_list:
+        fout.write('>seq\n'+seq+'\n')
+    fout.close()
     for hla_allele in hla_allele_list:
-        cmd = 'curl --data method=recommended&sequence_text='+prot_seq+'&allele='+','.join([hla_allele]*len(epitope_len_list))+'&length='+','.join(epitope_len_list)+' http://tools-cluster-interface.iedb.org/tools_api/'+mhcPredType(mhc_type_dict, hla_allele)+'/'
-        args = cmd.split()
-        process = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = process.communicate()
-        stdout_total+=[stdout]
-        
+        for epitope_len in epitope_len_list.split(','):
+            cmd = 'python '+iedb_path+'/predict_binding.py IEDB_recommended '+hla_allele+' '+epitope_len+' /u/home/p/panyang/Neo-Epitome/tmp.fasta'
+            args = cmd.split()
+            print args
+            process=subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            stdout, stderr = process.communicate()
+            stdout_total+=[stdout]
     return [parsePred(item) for item in stdout_total]
-'''
 
 def parsePred(stdout):
     ref_dict={}
@@ -114,7 +118,7 @@ def find_csq_num(info):
     else:
         sys.exit('# VCF file annotation error. Exit!')
 
-def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off, outdir):
+def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off, outdir, iedb_path):
     # Defining varaibles 
     fin_len=fileLen(fin)
     peptide_len = max(map(int,epitope_len_list))
@@ -169,8 +173,12 @@ def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off,
             ref_seq+=[prot_seq_ref[-1][start_pos[-1]:end_pos]]
 
         if len(dna_pos)==step or file_index==fin_len-1:
-            pred_result_mut=seqPred(mut_seq, hla_allele_list, epitope_len_list, mhc_type_dict)
-            pred_result_ref=seqPred(ref_seq, hla_allele_list, epitope_len_list, mhc_type_dict)
+            if iedb_path:
+                pred_result_mut=seqPred_local(mut_seq, hla_allele_list, epitope_len_list, mhc_type_dict, iedb_path)
+                pred_result_ref=seqPred_local(ref_seq, hla_allele_list, epitope_len_list, mhc_type_dict, iedb_path)
+            else:
+                pred_result_mut=seqPred(mut_seq, hla_allele_list, epitope_len_list, mhc_type_dict)
+                pred_result_ref=seqPred(ref_seq, hla_allele_list, epitope_len_list, mhc_type_dict)
             for i,pred_allele_result_mut in enumerate(pred_result_mut):
                 for k in pred_allele_result_mut:
                     foc=pred_allele_result_mut[k]/pred_result_ref[i][k]
@@ -299,7 +307,7 @@ def main():
     print str(now),'# Searching Neoepitopes for allele types',','.join(hla_allele_list), 'with ', ','.join(epitope_len_list),'long...'
     
     # Step 1. Predicting the Neo-epitope by HLA binding affinity. Generating TSV and FASTA files. 
-    mutationPipeline(fin, hla_allele_list, epitope_len_list, int(args.step), args.ic50_cut_off, outdir)
+    mutationPipeline(fin, hla_allele_list, epitope_len_list, int(args.step), args.ic50_cut_off, outdir, iedb_path)
     print str(now),'# Finished searching and predicting. The result is saved as: '+outdir+'/'+fin.split('/')[-1]+'.step1.out \n'
 
     # Step 2 (Optional). Confirming with coverage and epxression level information. Appending to TSV.
