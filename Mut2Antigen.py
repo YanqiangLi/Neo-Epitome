@@ -77,22 +77,21 @@ def seqPred(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict):
 		
 	return [parsePred(item) for item in stdout_total]
 
-def local_iedb(iedb_path, hla_allele, epitope_len):
+def localIEDBCommand(iedb_path, hla_allele, epitope_len):
 	cmd = 'python '+iedb_path+'/predict_binding.py IEDB_recommended '+hla_allele+' '+epitope_len+' tmp.fasta'
 	cmds = cmd.split()
-	print cmds
 	process=subprocess.Popen(cmds, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 	stdout, stderr = process.communicate()
 	return stdout
 
-def seqPred_local(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict, iedb_path):
+def seqPredLocal(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict, iedb_path):
 	stdout_total=[]
 	with open('tmp.fasta', 'w') as fw:
 		for seq in prot_seq_list:
 			fw.writelines('>seq\n'+seq+'\n')
 	for hla_allele in hla_allele_list:
 		for epitope_len in epitope_len_list:
-			stdout=local_iedb(iedb_path, hla_allele, epitope_len)
+			stdout=localIEDBCommand(iedb_path, hla_allele, epitope_len)
 			stdout_total+=[stdout]
 	return [parsePred(item) for item in stdout_total]
 
@@ -177,8 +176,8 @@ def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off,
 
 		if len(dna_pos)==step or file_index==fin_len-1:
 			if iedb_path:
-				pred_result_mut=seqPred_local(mut_seq, hla_allele_list, epitope_len_list, mhc_type_dict, iedb_path)
-				pred_result_ref=seqPred_local(ref_seq, hla_allele_list, epitope_len_list, mhc_type_dict, iedb_path)
+				pred_result_mut=seqPredLocal(mut_seq, hla_allele_list, epitope_len_list, mhc_type_dict, iedb_path)
+				pred_result_ref=seqPredLocal(ref_seq, hla_allele_list, epitope_len_list, mhc_type_dict, iedb_path)
 			else:
 				pred_result_mut=seqPred(mut_seq, hla_allele_list, epitope_len_list, mhc_type_dict)
 				pred_result_ref=seqPred(ref_seq, hla_allele_list, epitope_len_list, mhc_type_dict)
