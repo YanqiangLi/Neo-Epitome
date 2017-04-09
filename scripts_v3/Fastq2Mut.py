@@ -3,6 +3,37 @@ import multiprocessing as mp
 
 startTime = time.time()
 
+def SNP_calling_MuSE():
+	pass
+
+def SNP_calling_Mutect():
+	pass
+
+def SNP_calling_VarScan2(outPath, sampleID, reference, jarPath):
+	logging.debug('[DNA-seq] # Start VarScan.')
+	print '[DNA-seq] # Start VarScan.'
+	if os.path.exists(outPath+sampleID+'/'+sampleID+'.varscan.snp.vcf')==False:
+
+		cmd9='samtools mpileup -f '+reference+' -q 1 -B '+outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam '+outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam > '+outPath+sampleID+'/intermediate.pileup'
+		logging.debug('[DNA-seq] Running command 9: '+cmd9+'\n')
+		os.system(cmd9)
+
+		cmd10='java -jar '+jarPath+'/VarScan.jar somatic '+outPath+sampleID+'/intermediate.pileup '+outPath+sampleID+'/'+sampleID+'.varscan --mpileup 1 --min-coverage 8 --min-coverage-normal 8 --min-coverage-tumor 6 --min-var-freq 0.10 --min-freq-for-hom 0.75 --normal-purity 1.0 --tumor-purity 1.00 --p-value 0.99 --somatic-p-value 0.05 --strand-filter 0 --output-vcf'
+		logging.debug('[DNA-seq] Running command 10: '+cmd10+'\n')
+		os.system(cmd10)
+
+		cmd11='java -jar '+jarPath+'/VarScan.jar processSomatic '+outPath+sampleID+'/'+sampleID+'.varscan.snp.vcf --min-tumor-freq 0.10 --max-normal-freq 0.05 --p-value 0.07'
+		logging.debug('[DNA-seq] Running command 11: '+cmd11+'\n')
+		os.system(cmd11)
+
+		cmd12='java -jar '+jarPath+'/VarScan.jar processSomatic '+outPath+sampleID+'/'+sampleID+'.varscan.indel.vcf --min-tumor-freq 0.10 --max-normal-freq 0.05 --p-value 0.07'
+		logging.debug('[DNA-seq] Running command 12: '+cmd12+'\n')
+		os.system(cmd12)
+
+	if os.path.exists(outPath+sampleID+'/'+sampleID+'.varscan.snp.vcf')==False:
+		sys.exit('[DNA-seq] # An Error Occured. VarScan Incomplete. Exit!')
+	logging.debug('[DNA-seq] # DNA-seq based SNV calling completed.\n')
+
 def BRSQ(reference,binDir,prefixOut,known_snps):
 	
 	cmd7='java -jar '+binDir+'/GenomeAnalysisTK.jar -T BaseRecalibrator -nct 6 -R '+reference+' -I '+prefixOut+'.idrealn.mkdup.merged.sorted.output.bam -knownSites '+known_snps+' -o '+prefixOut+'.bqsr.grp'
