@@ -77,26 +77,28 @@ def seqPred(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict):
 		
 	return [parsePred(item) for item in stdout_total]
 
+def local_iedb(iedb_path, hla_allele, epitope_len):
+	cmd = 'python '+iedb_path+'/predict_binding.py IEDB_recommended '+hla_allele+' '+epitope_len+' tmp.fasta'
+	cmds = cmd.split()
+	print cmds
+	process=subprocess.Popen(cmds, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	stdout, stderr = process.communicate()
+	return stdout
+
 def seqPred_local(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict, iedb_path):
 	stdout_total=[]
-	fout=open('tmp.fasta','w')
-	for seq in prot_seq_list:
-		fout.write('>seq\n'+seq+'\n')
-	fout.close()
+	with open('tmp.fasta', 'w') as fw:
+		for seq in prot_seq_list:
+			fw.writelines('>seq\n'+seq+'\n')
 	for hla_allele in hla_allele_list:
 		for epitope_len in epitope_len_list:
-			cmd = 'python '+iedb_path+'/predict_binding.py IEDB_recommended '+hla_allele+' '+epitope_len+' tmp.fasta'
-			print cmd
-			args = cmd.split()
-			process=subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-			stdout, stderr = process.communicate()
+			stdout=local_iedb(iedb_path, hla_allele, epitope_len)
 			stdout_total+=[stdout]
-			
 	return [parsePred(item) for item in stdout_total]
 
 def parsePred(stdout):
 	ref_dict={}
-	ref_out=csv.DictReader(stdout.splitlines(),delimiter='\t')
+	ref_out=csv.DictReader(stdout.rstrip().splitlines(),delimiter='\t')
 	for r in ref_out:
 		ic50=[k for k in r.keys() if k.find('ic50')!=-1]
 		p = re.compile('\d+(\.\d+)?')
