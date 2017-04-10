@@ -60,10 +60,14 @@ def loadMHCType():
 	return mhc_type_dict
 
 def mhcPredType(mhc_type_dict, hla_allele):
-	if mhc_type_dict[hla_allele]=='MHCI':
-		return 'mhci'
+	if hla_allele in mhc_type_dict:
+		if mhc_type_dict[hla_allele]=='MHCI':
+			return 'mhci'
+		else:
+			return 'mhcii'
 	else:
-		return 'mhcii'
+		sys.exit("# Unsupported HLA type: "+hla_allele+". Exit! ")
+
 		
 def seqPred(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict):
 	prot_seq= '%0A'.join('%3Epredict'+str(i)+'%0A'+seq for i,seq in enumerate(prot_seq_list))
@@ -92,6 +96,9 @@ def seqPredLocal(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict, 
 	for hla_allele in hla_allele_list:
 		for epitope_len in epitope_len_list:
 			stdout=localIEDBCommand(iedb_path, hla_allele, epitope_len)
+			if stdout.startswith('Usage'):
+				print epitope_len,hla_allele
+				sys.exit('err')
 			stdout_total+=[stdout]
 	return [parsePred(item) for item in stdout_total]
 
@@ -280,7 +287,7 @@ def main():
 	parser = argparse.ArgumentParser(description='NeoEpitome-Mut2Antigen (v1.0)')
 	parser.add_argument('vcf_input', help='input annotated somatic mutation VCF file.')
 	parser.add_argument('-j', '--junction-input', help='input of somatic junctions file.')
-	parser.add_argument('-e', '--epitope-len-list', default='8,9,10', help='epitope length for prediction. Default is 8,9,10.')
+	parser.add_argument('-e', '--epitope-len-list', default='9,10', help='epitope length for prediction. Default is 9,10.')
 	parser.add_argument('-a', '--hla-allele-list', default='HLA-A*01:01,HLA-B*07:02', help='a list of HLA types. Default is HLA-A*01:01,HLA-B*01:01.')
 	parser.add_argument('--iedb', default=False, help='Specify local IEDB location if it is installed.')
 	parser.add_argument('--step', default=100, help='Number of entries per time sending to prediction. Default is 50.')

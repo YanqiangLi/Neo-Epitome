@@ -75,7 +75,7 @@ parser.add_argument('readsFilesCase',help='Tumor sample paired-end fastq files s
 parser.add_argument('readsFilesCtrl', help='Tumor sample paired-end fastq files seperated by ",".')
 parser.add_argument('-d','--binDir', help='Directory for java applications indluding GATK, picard.')
 parser.add_argument('-p','--sampleID', default='NeoEpitomeOut', help='Sample ID will be used for output folder name and reads group name.')
-
+parser.add_argument('--snv-calling-method',default='VarScan2', help='SNV calling method can be set as VarScan2, Mutect, MuSE, or concensus of the three. Default is VarScan2.')
 args = parser.parse_args()
 if args.sampleID.rstrip('/').find('/')!=-1:
 	[outPath,sampleID]=args.sampleID.rstrip('/').rsplit('/',1)
@@ -171,26 +171,17 @@ else:
 	print '[DNA-seq] # Skipped GATK bam refining - SNP.'
 
 #Step 4
-logging.debug('[DNA-seq] # Start VarScan.')
-print '[DNA-seq] # Start VarScan.'
-if os.path.exists(outPath+sampleID+'/'+sampleID+'.varscan.snp.vcf')==False:
+if args.snv_calling_method=='VarScan2':
+	SNP_calling_VarScan2(outPath, sampleID, reference, jarPath)
+elif args.snv_calling_method=='Mutect':
+	SNP_calling_Mutect()
+elif args.snv_calling_method=='MuSE':
+	SNP_calling_MuSE()
+elif args.snv_calling_method=='consensus':
+	SNP_calling_VarScan2(outPath, sampleID, reference, jarPath)
+	SNP_calling_Mutect()
+	SNP_calling_MuSE()
+else:
+	sys.exit('Unrecognized method of SNV calling. Exit!')
+	
 
-	cmd9='samtools mpileup -f '+args.reference+' -q 1 -B '+outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam '+outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam > '+outPath+sampleID+'/intermediate.pileup'
-	logging.debug('[DNA-seq] Running command 9: '+cmd9+'\n')
-	os.system(cmd9)
-
-	cmd10='java -jar '+jarPath+'/VarScan.jar somatic '+outPath+sampleID+'/intermediate.pileup '+outPath+sampleID+'/'+sampleID+'.varscan --mpileup 1 --min-coverage 8 --min-coverage-normal 8 --min-coverage-tumor 6 --min-var-freq 0.10 --min-freq-for-hom 0.75 --normal-purity 1.0 --tumor-purity 1.00 --p-value 0.99 --somatic-p-value 0.05 --strand-filter 0 --output-vcf'
-	logging.debug('[DNA-seq] Running command 10: '+cmd10+'\n')
-	os.system(cmd10)
-
-	cmd11='java -jar '+jarPath+'/VarScan.jar processSomatic '+outPath+sampleID+'/'+sampleID+'.varscan.snp.vcf --min-tumor-freq 0.10 --max-normal-freq 0.05 --p-value 0.07'
-	logging.debug('[DNA-seq] Running command 11: '+cmd11+'\n')
-	os.system(cmd11)
-
-	cmd12='java -jar '+jarPath+'/VarScan.jar processSomatic '+outPath+sampleID+'/'+sampleID+'.varscan.indel.vcf --min-tumor-freq 0.10 --max-normal-freq 0.05 --p-value 0.07'
-	logging.debug('[DNA-seq] Running command 12: '+cmd12+'\n')
-	os.system(cmd12)
-
-if os.path.exists(outPath+sampleID+'/'+sampleID+'.varscan.snp.vcf')==False:
-	sys.exit('[DNA-seq] # An Error Occured. VarScan Incomplete. Exit!')
-logging.debug('[DNA-seq] # DNA-seq based SNV calling completed.\n')
