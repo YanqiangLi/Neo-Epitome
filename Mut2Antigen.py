@@ -306,6 +306,7 @@ def main():
 	epitope_len_list=args.epitope_len_list.split(',')
 	if min(epitope_len_list)<8:
 		sys.exit("# The request epitope length is too small. Exit.")
+	iedb_path=args.iedb
 	if args.iedb!=False:
 		iedb_path=args.iedb.rstrip('/')
 	hla_allele_list=args.hla_allele_list.split(',')
