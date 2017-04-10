@@ -3,11 +3,35 @@ import multiprocessing as mp
 
 startTime = time.time()
 
-def SNP_calling_MuSE():
-	pass
+def SNP_calling_MuSE(outPath, sampleID, reference, known_snps):
+	logging.debug('[DNA-seq] # Start MuSE.')
+	print '[DNA-seq] # Start MuSE.'
+	if os.path.exists(outPath+sampleID+'/'+sampleID+'.muse.snp.vcf')==False:
 
-def SNP_calling_Mutect():
-	pass
+		cmd9='MuSE call -f '+reference+' '+outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam '+outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam '+'-O '+outPath+sampleID+'/'+sampleID+'intermediate_muse_call.txt'
+		logging.debug('[DNA-seq] Running command 9: '+cmd9+'\n')
+		os.system(cmd9)
+
+		cmd10='MuSE sump -E -I '+outPath+sampleID+'/'+sampleID+'intermediate_muse_call.txt'+' –O '+outPath+sampleID+'/'+sampleID+'muse.snp.vcf –D '+known_snps
+		logging.debug('[DNA-seq] Running command 10: '+cmd10+'\n')
+		os.system(cmd10)
+
+	if os.path.exists(outPath+sampleID+'/'+sampleID+'.muse.snp.vcf')==False:
+		sys.exit('[DNA-seq] # An Error Occured. MuSE Incomplete. Exit!')
+	logging.debug('[DNA-seq] # DNA-seq based SNV calling completed.\n')
+
+def SNP_calling_Mutect(outPath, sampleID, reference, known_snps, jarPath):
+	logging.debug('[DNA-seq] # Start Mutect.')
+	print '[DNA-seq] # Start Mutect.'
+	if os.path.exists(outPath+sampleID+'/'+sampleID+'.mutect.snp.txt')==False:
+
+		cmd9='java -jar '+jarPath+'/mutect.jar --analysis_type MuTect --reference_sequence '+reference+' '+'--dbsnp '+known_snps+' --input_file:normal '+outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam --input_file:tumor '+outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam --out '+outPath+sampleID+'/'+sampleID+'.mutect.snp.txt'
+		logging.debug('[DNA-seq] Running command 9: '+cmd9+'\n')
+		os.system(cmd9)
+
+	if os.path.exists(outPath+sampleID+'/'+sampleID+'.mutect.snp.txt')==False:
+		sys.exit('[DNA-seq] # An Error Occured. Mutect Incomplete. Exit!')
+	logging.debug('[DNA-seq] # DNA-seq based SNV calling completed.\n')
 
 def SNP_calling_VarScan2(outPath, sampleID, reference, jarPath):
 	logging.debug('[DNA-seq] # Start VarScan.')
@@ -172,16 +196,23 @@ else:
 
 #Step 4
 if args.snv_calling_method=='VarScan2':
-	SNP_calling_VarScan2(outPath, sampleID, reference, jarPath)
+	SNP_calling_VarScan2(outPath, sampleID, args.reference, jarPath)
 elif args.snv_calling_method=='Mutect':
-	SNP_calling_Mutect()
+	SNP_calling_Mutect(outPath, sampleID, args.reference, args.known_snps, jarPath)
 elif args.snv_calling_method=='MuSE':
-	SNP_calling_MuSE()
+	SNP_calling_MuSE(outPath, sampleID, args.reference, args.known_snps)
 elif args.snv_calling_method=='consensus':
-	SNP_calling_VarScan2(outPath, sampleID, reference, jarPath)
-	SNP_calling_Mutect()
-	SNP_calling_MuSE()
+	callings=[]
+	callings.append(mp.Process(target=SNP_calling_VarScan2,args=(outPath, sampleID, args.reference, jarPath)))
+	callings[0].start()
+	callings.append(mp.Process(target=SNP_calling_MuSE,args=(outPath, sampleID, args.reference, args.known_snps)))
+	callings[1].start()
+	callings.append(mp.Process(target=SNP_calling_Mutect,args=(outPath, sampleID, args.reference, args.known_snps, jarPath)))
+	callings[2].start()
+	callings[0].join()
+	callings[1].join()
+	callings[2].join()
 else:
 	sys.exit('Unrecognized method of SNV calling. Exit!')
-	
+
 
