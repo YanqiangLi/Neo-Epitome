@@ -23,20 +23,47 @@ def SNP_calling_MuSE(outPath, sampleID, reference, known_snps):
 	logging.debug('[DNA-seq] # MuSE SNV calling completed.')
 	print '[DNA-seq] # MuSE SNV calling completed.'
 
+def SNP_calling_MuTect_command(outPath, sampleID, reference, known_snps, jarPath, n):
+
+	cmd9=JAVA7+' -jar '+jarPath+'/mutect.jar --analysis_type MuTect --intervals '+outPath+sampleID+'/'+sampleID+'.intervals.'+str(n)+'.bed --reference_sequence '+reference+' --dbsnp '+known_snps+' --input_file:normal '+outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam --input_file:tumor '+outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam --out '+outPath+sampleID+'/'+sampleID+'.'+str(n)+'.mutect.snp.txt'
+	logging.debug('[DNA-seq] Running command 9: '+cmd9+'\n')
+	os.system(cmd9)
+
 def SNP_calling_MuTect(outPath, sampleID, reference, known_snps, jarPath):
 	logging.debug('[DNA-seq] # Start MuTect.')
 	print '[DNA-seq] # Start MuTect.'
-	if os.path.exists(outPath+sampleID+'/'+sampleID+'.mutect.snp.txt')==False:
 
-		cmd9=JAVA7+' -jar '+jarPath+'/mutect.jar --analysis_type MuTect --reference_sequence '+reference+' --dbsnp '+known_snps+' --input_file:normal '+outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam --input_file:tumor '+outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam --out '+outPath+sampleID+'/'+sampleID+'.mutect.snp.txt'
-		logging.debug('[DNA-seq] Running command 9: '+cmd9+'\n')
-		os.system(cmd9)
+	if os.path.exists(outPath+sampleID+'/'+sampleID+'.mutect.snp.txt')==False:
+		base=0
+		m=1
+		fout=open(outPath+sampleID+'/'+sampleID+'.intervals.'+str(m)+'.bed','w')
+		for l in open(reference+'.fai'):
+			ls=l.strip().split('\t')
+			base+=int(ls[1])
+			if base<=300000000:
+				fout.write('{}\t{}\t{}\n'.format(ls[0],0,int(ls[1])-1))
+			else:
+				base=0
+				fout.close()
+				m+=1
+				fout=open(outPath+sampleID+'/'+sampleID+'.intervals.'+str(m)+'.bed','w')
+				fout.write('{}\t{}\t{}\n'.format(ls[0],0,int(ls[1])-1))
+		fout.close()
+
+		mutect_calling=[]
+		for n in xrange(1,m+1):
+			mutect_calling.append(mp.Process(target=SNP_calling_MuTect_command,args=(outPath, sampleID, reference, known_snps, jarPath, n)))
+			mutect_calling[n-1].start()
+		for n in xrange(1,m+1):
+			mutect_calling[n-1].join()
+		
+		os.system('cat '+outPath+sampleID+'/'+sampleID+'.*.mutect.snp.txt >'+outPath+sampleID+'/'+sampleID+'.mutect.snp.txt')
 
 	if os.path.exists(outPath+sampleID+'/'+sampleID+'.mutect.snp.txt')==False:
 		sys.exit('[DNA-seq] # An Error Occured. MuTect Incomplete. Exit!')
 	logging.debug('[DNA-seq] # MuTect SNV calling completed.')
 	print '[DNA-seq] # MuTect SNV calling completed.'
-
+	
 def SNP_calling_VarScan2(outPath, sampleID, reference, jarPath):
 	logging.debug('[DNA-seq] # Start VarScan2.')
 	print '[DNA-seq] # Start VarScan2.'
