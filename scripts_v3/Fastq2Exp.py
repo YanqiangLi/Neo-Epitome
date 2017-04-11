@@ -9,6 +9,7 @@ def STAR_alignment(readsFilesCaseRNA, starGenomeDir,outDir):
 		cmd1='STAR --genomeDir '+starGenomeDir+' --twopassMode Basic --readFilesIn '+readsFiles_split+' --runThreadN 6 --outFilterMultimapScoreRange 1 --outFilterMultimapNmax 20 --outFilterMismatchNmax 10 --alignIntronMax 500000 --alignMatesGapMax 1000000 --sjdbScore 2 --alignSJDBoverhangMin 1 --genomeLoad NoSharedMemory --limitBAMsortRAM 0 --outFilterMatchNminOverLread 0.33 --outFilterScoreMinOverLread 0.33 --sjdbOverhang 99 --outSAMstrandField intronMotif --outSAMattributes NH HI NM MD AS XS --outSAMunmapped Within --outSAMtype BAM SortedByCoordinate --outSAMheaderHD @HD VN:1.4 --outFileNamePrefix '+outDir+'/'	
 	logging.debug('[RNA-seq] Running command 1: '+cmd1+'\n')
 	os.system(cmd1)
+	
 def cufflinks(gtf, sampleID):
 	cmd2='cufflinks --multi-read-correct -p 8 --GTF '+gtf+' -o '+sampleID+'/cufflinks '+sampleID+'/Aligned.sortedByCoord.out.bam'
 	logging.debug('[RNA-seq] Running command 2: '+cmd2+'\n')

@@ -100,6 +100,7 @@ def seqPredLocal(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict, 
 				print epitope_len,hla_allele
 				sys.exit('err')
 			stdout_total+=[stdout]
+	os.system('rm tmp.fasta')
 	return [parsePred(item) for item in stdout_total]
 
 def parsePred(stdout):
@@ -117,7 +118,7 @@ def mergePeps2Database(fastafile, reference, outdir):
 	os.system("cat "+reference +' '+ fastafile + ">" + outdir + "/merge_" + fastafile.split('/')[-1])
 	return os.path.basename(outdir + "/merge_" + fastafile.split('/')[-1])
 
-def find_csq_num(info):
+def findCSQNum(info):
 	csq_num=-1
 	for t,info_field in enumerate(info):
 		if info_field.startswith('CSQ='):
@@ -150,7 +151,7 @@ def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off,
 		ls=l.strip().split('\t')
 		info=ls[7].split(';')
 		if csq_num==-1:
-			csq_num=find_csq_num(info)
+			csq_num=findCSQNum(info)
 		csq_value = info[csq_num].split(',')[0].split('|')
 		annotation=dict(zip(csq_header,csq_value))
 
