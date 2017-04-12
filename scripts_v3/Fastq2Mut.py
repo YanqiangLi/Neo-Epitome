@@ -5,19 +5,89 @@ startTime = time.time()
 JAVA7='/usr/bin/java'
 JAVA8='/u/local/apps/java/jdk1.8.0_111/bin/java'
 
+def parsing_SNV_consensus(outPath, sampleID):
+	mut_dict={}
+	for l in open(outPath+sampleID+'/'+sampleID+'.varscan.snp.Somatic.hc.vcf'):
+		if l.startswith('#'):
+			continue
+		ls=l.strip().split('\t')
+		mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]]=set(['VarScan2'])
+	for l in open(outPath+sampleID+'/'+sampleID+'.varscan.indel.Somatic.hc.vcf'):
+		if l.startswith('#'):
+			continue
+		ls=l.strip().split('\t')
+		if mut_dict.has_key(ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]):
+			mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]].add(['VarScan2'])
+		else:
+			mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]]=set(['VarScan2'])
+	for l in open(outPath+sampleID+'/'+sampleID+'.muse.snp.vcf'):
+		if l.startswith('#'):
+			continue
+		ls=l.strip().split('\t')
+		if mut_dict.has_key(ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]):
+			mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]].add('MuSE')
+		else:
+			mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]]=set(['MuSE'])
+	for l in open(outPath+sampleID+'/'+sampleID+'.mutect.snp.txt'):
+		if l.startswith('#'):
+			continue
+		ls=l.strip().split('\t')
+		if ls[-1]=='KEEP':
+			if mut_dict.has_key(ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]):
+				mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]].add('MuTect')
+			else:
+				mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]]=set(['MuTect'])
 
-def SNP_calling_MuSE(outPath, sampleID, reference, known_snps):
+	fout=open(outPath+sampleID+'/'+sampleID+'.consensus.snv.vcf','w')
+	fout.write('##fileformat=VCFv4.0\n##source=Formated\n##phasing=none\n')
+	fout.write(('{}\t'*9+'{}\n').format('#CHROM','POS','ID','REF','ALT','QUAL','FILTER','INFO','FORMAT',sampleID))
+	for key in mut_dict.keys():
+		if len(mut_dict[key])>=2:
+			ks=key.split('_')
+			fout.write(('{}\t'*9+'{}\n').format(ks[0],ks[1],'.',ks[2],ks[3],len(mut_dict[key]),'.','.',';'.join(mut_dict[key]),'.'))
+	fout.close()
+
+def create_intervals(outPath, sampleID, reference):
+	base=0
+	m=1
+	fout=open(outPath+sampleID+'/'+sampleID+'.intervals.'+str(m)+'.bed','w')
+	for l in open(reference+'.fai'):
+		ls=l.strip().split('\t')
+		base+=int(ls[1])
+		if base<=300000000:
+			fout.write('{}\t{}\t{}\n'.format(ls[0],0,int(ls[1])-1))
+		else:
+			base=0
+			fout.close()
+			m+=1
+			fout=open(outPath+sampleID+'/'+sampleID+'.intervals.'+str(m)+'.bed','w')
+			fout.write('{}\t{}\t{}\n'.format(ls[0],0,int(ls[1])-1))
+	fout.close()
+	return m
+
+def SNP_calling_MuSE_command(outPath, sampleID, reference, known_snps, n):
+	cmd9='MuSE call -f '+reference+' '+outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam -l '+outPath+sampleID+'/'+sampleID+'.intervals.'+str(n)+'.bed '+outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam '+'-O '+outPath+sampleID+'/'+sampleID+'.intermediate.'+str(n)
+	logging.debug('[DNA-seq] Running command 9: '+cmd9+'\n')
+	os.system(cmd9)
+
+def SNP_calling_MuSE(outPath, sampleID, reference, known_snps, numInterval):
 	logging.debug('[DNA-seq] # Start MuSE.')
 	print '[DNA-seq] # Start MuSE.'
-	if os.path.exists(outPath+sampleID+'/'+sampleID+'.muse.snp.vcf')==False:
 
-		cmd9='MuSE call -f '+reference+' '+outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam '+outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam '+'-O '+outPath+sampleID+'/'+sampleID+'.intermediate'
-		logging.debug('[DNA-seq] Running command 9: '+cmd9+'\n')
-		os.system(cmd9)
+	if os.path.exists(outPath+sampleID+'/'+sampleID+'.muse.snp.vcf')==False:
+		muse_calling=[]
+		for n in xrange(1,numInterval+1):
+			muse_calling.append(mp.Process(target=SNP_calling_MuSE_command,args=(outPath, sampleID, reference, known_snps, n)))
+			muse_calling[n-1].start()
+		for n in xrange(1,numInterval+1):
+			muse_calling[n-1].join()
+
+		os.system('cat '+outPath+sampleID+'/'+sampleID+'.intermediate.*.MuSE.txt >'+outPath+sampleID+'/'+sampleID+'.intermediate.MuSE.txt')
+		os.system('rm '+outPath+sampleID+'/'+sampleID+'intermediate.*.MuSE.txt')
 		cmd10='MuSE sump -E -I '+outPath+sampleID+'/'+sampleID+'.intermediate.MuSE.txt'+' -O '+outPath+sampleID+'/'+sampleID+'.muse.snp.vcf -D '+known_snps
 		logging.debug('[DNA-seq] Running command 10: '+cmd10+'\n')
 		os.system(cmd10)
-
+		
 	if os.path.exists(outPath+sampleID+'/'+sampleID+'.muse.snp.vcf')==False:
 		sys.exit('[DNA-seq] # An Error Occured. MuSE Incomplete. Exit!')
 	logging.debug('[DNA-seq] # MuSE SNV calling completed.')
@@ -29,36 +99,21 @@ def SNP_calling_MuTect_command(outPath, sampleID, reference, known_snps, jarPath
 	logging.debug('[DNA-seq] Running command 9: '+cmd9+'\n')
 	os.system(cmd9)
 
-def SNP_calling_MuTect(outPath, sampleID, reference, known_snps, jarPath):
+def SNP_calling_MuTect(outPath, sampleID, reference, known_snps, jarPath, numInterval):
 	logging.debug('[DNA-seq] # Start MuTect.')
 	print '[DNA-seq] # Start MuTect.'
 
 	if os.path.exists(outPath+sampleID+'/'+sampleID+'.mutect.snp.txt')==False:
-		base=0
-		m=1
-		fout=open(outPath+sampleID+'/'+sampleID+'.intervals.'+str(m)+'.bed','w')
-		for l in open(reference+'.fai'):
-			ls=l.strip().split('\t')
-			base+=int(ls[1])
-			if base<=300000000:
-				fout.write('{}\t{}\t{}\n'.format(ls[0],0,int(ls[1])-1))
-			else:
-				base=0
-				fout.close()
-				m+=1
-				fout=open(outPath+sampleID+'/'+sampleID+'.intervals.'+str(m)+'.bed','w')
-				fout.write('{}\t{}\t{}\n'.format(ls[0],0,int(ls[1])-1))
-		fout.close()
 
 		mutect_calling=[]
-		for n in xrange(1,m+1):
+		for n in xrange(1,numInterval+1):
 			mutect_calling.append(mp.Process(target=SNP_calling_MuTect_command,args=(outPath, sampleID, reference, known_snps, jarPath, n)))
 			mutect_calling[n-1].start()
-		for n in xrange(1,m+1):
+		for n in xrange(1,numInterval+1):
 			mutect_calling[n-1].join()
 		
 		os.system('cat '+outPath+sampleID+'/'+sampleID+'.*.mutect.snp.txt >'+outPath+sampleID+'/'+sampleID+'.mutect.snp.txt')
-
+		os.system('rm '+outPath+sampleID+'/'+sampleID+'.*.mutect.snp.txt')
 	if os.path.exists(outPath+sampleID+'/'+sampleID+'.mutect.snp.txt')==False:
 		sys.exit('[DNA-seq] # An Error Occured. MuTect Incomplete. Exit!')
 	logging.debug('[DNA-seq] # MuTect SNV calling completed.')
@@ -132,20 +187,19 @@ parser.add_argument('readsFilesCase',help='Tumor sample paired-end fastq files s
 parser.add_argument('readsFilesCtrl', help='Tumor sample paired-end fastq files seperated by ",".')
 parser.add_argument('-d','--binDir', help='Directory for java applications indluding GATK, picard.')
 parser.add_argument('-p','--sampleID', default='NeoEpitomeOut', help='Sample ID will be used for output folder name and reads group name.')
-parser.add_argument('--snv-calling-method',default='VarScan2', help='SNV calling method can be set as VarScan2, MuTect, MuSE, or concensus of the three. Default is VarScan2.')
+parser.add_argument('--snv-calling-method',default='VarScan2', help='SNV calling method can be set as VarScan2, MuTect, MuSE, or consensus of the three. Default is VarScan2.')
 args = parser.parse_args()
+if args.snv_calling_method=='MuSE' or args.snv_calling_method=='consensus':
+	if args.known_snps.endswith('vcf.gz')!=True:
+		sys.exit('[DNA-seq] # MuSE requires VCF annotations in the format of bgzip with tabix. Exit!')
 if args.sampleID.rstrip('/').find('/')!=-1:
 	[outPath,sampleID]=args.sampleID.rstrip('/').rsplit('/',1)
 	outPath+='/'
 else:
 	sampleID=args.sampleID.rstrip('/')
 	outPath=''
-
-
 jarPath='/'+args.binDir.strip('/')
-
 os.system('mkdir -p '+outPath+sampleID)
-
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(message)s',
                     filename=outPath+sampleID+'/NeoEpitome-Fastq2Mut.log'+ str(datetime.datetime.now())+'.txt' ,
@@ -231,60 +285,24 @@ else:
 if args.snv_calling_method=='VarScan2':
 	SNP_calling_VarScan2(outPath, sampleID, args.reference, jarPath)
 elif args.snv_calling_method=='MuTect':
-	SNP_calling_MuTect(outPath, sampleID, args.reference, args.known_snps, jarPath)
+	numInterval=create_intervals(outPath, sampleID, args.reference)
+	SNP_calling_MuTect(outPath, sampleID, args.reference, args.known_snps, jarPath, numInterval)
 elif args.snv_calling_method=='MuSE':
-	SNP_calling_MuSE(outPath, sampleID, args.reference, args.known_snps)
+	numInterval=create_intervals(outPath, sampleID, args.reference)
+	SNP_calling_MuSE(outPath, sampleID, args.reference, args.known_snps, numInterval)
 elif args.snv_calling_method=='consensus':
+	numInterval=create_intervals(outPath, sampleID, args.reference)
 	callings=[]
 	callings.append(mp.Process(target=SNP_calling_VarScan2,args=(outPath, sampleID, args.reference, jarPath)))
 	callings[0].start()
-	callings.append(mp.Process(target=SNP_calling_MuSE,args=(outPath, sampleID, args.reference, args.known_snps)))
+	callings.append(mp.Process(target=SNP_calling_MuSE,args=(outPath, sampleID, args.reference, args.known_snps, numInterval)))
 	callings[1].start()
-	callings.append(mp.Process(target=SNP_calling_MuTect,args=(outPath, sampleID, args.reference, args.known_snps, jarPath)))
+	callings.append(mp.Process(target=SNP_calling_MuTect,args=(outPath, sampleID, args.reference, args.known_snps, jarPath, numInterval)))
 	callings[2].start()
 	callings[0].join()
 	callings[1].join()
 	callings[2].join()
-	mut_dict={}
-	for l in open(outPath+sampleID+'/'+sampleID+'.varscan.snp.Somatic.hc.vcf'):
-		if l.startswith('#'):
-			continue
-		ls=l.strip().split('\t')
-		mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]]=set(['VarScan2'])
-	for l in open(outPath+sampleID+'/'+sampleID+'.varscan.indel.Somatic.hc.vcf'):
-		if l.startswith('#'):
-			continue
-		ls=l.strip().split('\t')
-		if mut_dict.has_key(ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]):
-			mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]].add(['VarScan2'])
-		else:
-			mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]]=set(['VarScan2'])
-	for l in open(outPath+sampleID+'/'+sampleID+'.muse.snp.vcf'):
-		if l.startswith('#'):
-			continue
-		ls=l.strip().split('\t')
-		if mut_dict.has_key(ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]):
-			mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]].add('MuSE')
-		else:
-			mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]]=set(['MuSE'])
-	for l in open(outPath+sampleID+'/'+sampleID+'.mutect.snp.txt'):
-		if l.startswith('#'):
-			continue
-		ls=l.strip().split('\t')
-		if ls[-1]=='KEEP':
-			if mut_dict.has_key(ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]):
-				mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]].add('MuTect')
-			else:
-				mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]]=set(['MuTect'])
-
-	fout=open(outPath+sampleID+'/'+sampleID+'.consensus.snv.vcf','w')
-	fout.write('##fileformat=VCFv4.0\n##source=Formated\n##phasing=none\n')
-	fout.write(('{}\t'*9+'{}\n').format('#CHROM','POS','ID','REF','ALT','QUAL','FILTER','INFO','FORMAT',sampleID))
-	for key in mut_dict.keys():
-		if len(mut_dict[key])>=2:
-			ks=key.split('_')
-			fout.write(('{}\t'*9+'{}\n').format(ks[0],ks[1],'.',ks[2],ks[3],len(mut_dict[key]),'.','.',';'.join(mut_dict[key]),'.'))
-	fout.close()
+	parsing_SNV_consensus(outPath, sampleID)
 else:
 	sys.exit('Unrecognized method of SNV calling. Exit!')
 

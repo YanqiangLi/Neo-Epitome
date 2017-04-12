@@ -67,7 +67,6 @@ def mhcPredType(mhc_type_dict, hla_allele):
 			return 'mhcii'
 	else:
 		sys.exit("# Unsupported HLA type: "+hla_allele+". Exit! ")
-
 		
 def seqPred(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict):
 	prot_seq= '%0A'.join('%3Epredict'+str(i)+'%0A'+seq for i,seq in enumerate(prot_seq_list))
@@ -203,6 +202,16 @@ def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off,
 					fout_seq.write('>{}\n{}\n'.format(dna_pos[seq_index]+'_'+dna_var[seq_index]+'_'+gene_name[seq_index]+'_'+prot_ac[seq_index]+'_'+str(prot_pos[seq_index])+'_'+prot_var[seq_index]+'_'+str(epitope_len)+'_'+allele,prot_seq_mut[seq_index])) #FASTA with full length mutant protein sequences, let the library search algorithm to remove duplicated fragments.
 			seq_num,dna_pos,dna_var,prot_ac,gene_name,gene_ac,trnscrpt_ac,prot_pos,prot_var,prot_seq_ref,prot_seq_mut,start_pos,mut_seq,ref_seq=([] for i in range(14))
 
+def vcfAnnotation(vcf_input, outdir):
+	pluginpath='~/nobackup-yxing/.vep/Plugins/'
+	veppath='~/nobackup-yxing/variant_effect_predictor'
+	print '# Run VEP annotation.'
+	cmd1='perl '+veppath+'/variant_effect_predictor.pl --input_file '+vcf_input+' --format vcf --output_file '+outdir+'/'+vcf_input.split('/')[-1].split('.vcf')[0]+'.vep.vcf --vcf --symbol --terms SO --plugin Downstream --plugin Wildtype --dir_plugins '+pluginpath+' --cache --uniprot --canonical -hgvs --offline'
+	os.system(cmd1)
+	if os.path.exists(outdir+'/'+vcf_input.split('/')[-1].split('.vcf')[0]+'.vep.vcf')==False:
+		sys.exit('[VEP annotation] # An Error Has Occured. VEP Annotation Incomplete. Exit!')
+	return outdir+'/'+vcf_input.split('/')[-1].split('.vcf')[0]+'.vep.vcf'
+
 def appendExpandCov(args):
 	msg=False
 	if (args.exp_gene_rna is not None
@@ -290,11 +299,12 @@ def main():
 	parser.add_argument('-j', '--junction-input', help='input of somatic junctions file.')
 	parser.add_argument('-e', '--epitope-len-list', default='9,10', help='epitope length for prediction. Default is 9,10.')
 	parser.add_argument('-a', '--hla-allele-list', default='HLA-A*01:01,HLA-B*07:02', help='a list of HLA types. Default is HLA-A*01:01,HLA-B*01:01.')
+	parser.add_argument('-o', '--outdir', default= 'Result.'+ID, help='The output directory.')
+	parser.add_argument('--vcf-annotation', action='store_true', help='Specify local IEDB location if it is installed.')
 	parser.add_argument('--iedb', default=False, help='Specify local IEDB location if it is installed.')
 	parser.add_argument('--step', default=100, help='Number of entries per time sending to prediction. Default is 50.')
 	parser.add_argument('--ic50-cut-off', default=1000, help='Cut-off based on median value of concensus predicted IC50 values. Default is 1000.')
-	parser.add_argument('-o', '--outdir', default= 'Result.'+ID, help='The output directory.')
-	parser.add_argument('-p', '--protein-ms', type=argparse.FileType('r'), help='mzML format is recommended. Currently only support library search. Quantatitive pipeline is under development.')
+	parser.add_argument('--protein-ms', type=argparse.FileType('r'), help='mzML format is recommended. Currently only support library search. Quantatitive pipeline is under development.')
 	parser.add_argument('--protein-reference', default= 'data/.fasta', help='fasta format reference protein sequences. Details see MSGFPlus manu.')
 	parser.add_argument('--protein-mod', default= 'data/mod.txt', help='protein modification file needed for labeled MS data library search. Details see MSGFPlus manu.')
 	parser.add_argument('--exp-gene-rna', type=argparse.FileType('r'), help='genes.fpkm_tracking file from Cufflinks')
@@ -304,6 +314,14 @@ def main():
 	args = parser.parse_args()
 
 	fin=args.vcf_input
+	outdir=args.outdir.strip('/')
+	os.system('mkdir -p '+outdir)
+	if args.vcf_annotation:
+		if fin.split('/')[-1].endswith('.vep.vcf')!=True:
+			fin=vcfAnnotation(fin, outdir)
+			print fin
+		else:
+			sys.exit('# The input VCF file seems already annotated. Please rename the file without ".vep" or remove argument "--vcf-annotation"')
 	epitope_len_list=args.epitope_len_list.split(',')
 	if min(epitope_len_list)<8:
 		sys.exit("# The request epitope length is too small. Exit.")
@@ -311,8 +329,7 @@ def main():
 	if args.iedb!=False:
 		iedb_path=args.iedb.rstrip('/')
 	hla_allele_list=args.hla_allele_list.split(',')
-	outdir=args.outdir.strip('/')
-	os.system('mkdir -p '+outdir)
+	
 
 	
 	print str(now),'# Searching Neoepitopes for allele types',','.join(hla_allele_list), 'with ', ','.join(epitope_len_list),'long...'
