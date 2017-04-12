@@ -2,6 +2,7 @@ import sys, argparse, subprocess, csv, re, numpy, datetime, os, uuid
 
 #python Mut2Antigen.py --cov-site-dna example_data/snvs.bam_readcount --exp-gene-rna example_data/genes.fpkm_tracking example_data/input.vcf
 #python Mut2Antigen.py --step 50 -a HLA-A*01:01,HLA-A*02:01,HLA-B*57:01,HLA-B*15:01,HLA-C*06:02,HLA-C*03:04 --exp-gene-rna neoantigen_2899/genes.fpkm_tracking --exp-isoform-rna neoantigen_2899/isoforms.fpkm_tracking --cov-site-dna neoantigen_2899/DNA.readcount --cov-site-rna neoantigen_2899/RNA.readcount neoantigen_2899/neoantigen_2899.snp.vep.vcf
+# USER need to set VEP path and VEP cache path for annotation step to be functional.
 
 now = datetime.datetime.now()
 ID = str(uuid.uuid4()).split('-')[0]
@@ -329,9 +330,7 @@ def main():
 	if args.iedb!=False:
 		iedb_path=args.iedb.rstrip('/')
 	hla_allele_list=args.hla_allele_list.split(',')
-	
 
-	
 	print str(now),'# Searching Neoepitopes for allele types',','.join(hla_allele_list), 'with ', ','.join(epitope_len_list),'long...'
 	
 	# Step 1. Predicting the Neo-epitope by HLA binding affinity. Generating TSV and FASTA files. 
