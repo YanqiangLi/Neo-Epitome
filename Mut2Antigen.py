@@ -55,6 +55,18 @@ def fileLen(fin):
 			pass
 	return i
 
+def vcfAnnotation(vcf_input, outdir):
+	pluginpath='~/nobackup-yxing/.vep/Plugins/'
+	veppath='~/nobackup-yxing/variant_effect_predictor'
+	print '# Run VEP annotation.'
+	cmd1='perl '+veppath+'/variant_effect_predictor.pl --input_file '+vcf_input+' --format vcf --output_file '+outdir+'/'+vcf_input.split('/')[-1].split('.vcf')[0]+'.vep.vcf --vcf --symbol --terms SO --plugin Downstream --plugin Wildtype --dir_plugins '+pluginpath+' --cache --uniprot --canonical -hgvs --offline'
+	#cmd1='perl '+veppath+'/vep --dir [dir] --input_file '+vcf_input+' --format vcf --output_file '+outdir+'/'+vcf_input.split('/')[-1].split('.vcf')[0]+'.vep.vcf --vcf --symbol --terms SO --plugin Downstream --plugin Wildtype --dir_plugins '+pluginpath+' --cache --uniprot --canonical -hgvs --offline'
+	#'./vep --species homo_sapiens --assembly GRCh37 --offline --dir_cache ../ --input_file ~/VCF4neoantigen/input.vcf --vcf --dir_plugins ~/.vep/Plugins/ --plugin Downstream --plugin Wildtype'
+	os.system(cmd1)
+	if os.path.exists(outdir+'/'+vcf_input.split('/')[-1].split('.vcf')[0]+'.vep.vcf')==False:
+		sys.exit('[VEP annotation] # An Error Has Occured. VEP Annotation Incomplete. Exit!')
+	return outdir+'/'+vcf_input.split('/')[-1].split('.vcf')[0]+'.vep.vcf'
+
 def loadMHCType():
 	mhc_type_dict={x.strip():'MHCI' for x in open('data/MHCI.txt')}
 	mhc_type_dict.update({x.strip():'MHCII' for x in open('data/MHCII.txt')})
@@ -197,21 +209,11 @@ def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off,
 					start_pos_seq=int(start_pos[seq_index])+int(ks[2])
 					allele=ks[0]
 					epitope_len=ks[3]
-					fout.write(('{}\t'*15+'{}\n').format(dna_pos[seq_index],dna_var[seq_index],gene_name[seq_index],gene_ac[seq_index],trnscrpt_ac[seq_index],prot_ac[seq_index],prot_pos[seq_index],prot_var[seq_index],start_pos_seq,epitope_len,allele,pred_result_ref[i][k],pred_allele_result_mut[k],foc,mut_seq[seq_index],pred_allele_result_mut[k][1]))
-					if pred_allele_result_mut[k]>int(ic50_cut_off):
+					fout.write(('{}\t'*15+'{}\n').format(dna_pos[seq_index],dna_var[seq_index],gene_name[seq_index],gene_ac[seq_index],trnscrpt_ac[seq_index],prot_ac[seq_index],prot_pos[seq_index],prot_var[seq_index],start_pos_seq,epitope_len,allele,pred_result_ref[i][k][0],pred_allele_result_mut[k][0],foc,mut_seq[seq_index],pred_allele_result_mut[k][1]))
+					if pred_allele_result_mut[k][0]>int(ic50_cut_off):
 						continue
 					fout_seq.write('>{}\n{}\n'.format(dna_pos[seq_index]+'_'+dna_var[seq_index]+'_'+gene_name[seq_index]+'_'+prot_ac[seq_index]+'_'+str(prot_pos[seq_index])+'_'+prot_var[seq_index]+'_'+str(epitope_len)+'_'+allele,prot_seq_mut[seq_index])) #FASTA with full length mutant protein sequences, let the library search algorithm to remove duplicated fragments.
 			seq_num,dna_pos,dna_var,prot_ac,gene_name,gene_ac,trnscrpt_ac,prot_pos,prot_var,prot_seq_ref,prot_seq_mut,start_pos,mut_seq,ref_seq=([] for i in range(14))
-
-def vcfAnnotation(vcf_input, outdir):
-	pluginpath='~/nobackup-yxing/.vep/Plugins/'
-	veppath='~/nobackup-yxing/variant_effect_predictor'
-	print '# Run VEP annotation.'
-	cmd1='perl '+veppath+'/variant_effect_predictor.pl --input_file '+vcf_input+' --format vcf --output_file '+outdir+'/'+vcf_input.split('/')[-1].split('.vcf')[0]+'.vep.vcf --vcf --symbol --terms SO --plugin Downstream --plugin Wildtype --dir_plugins '+pluginpath+' --cache --uniprot --canonical -hgvs --offline'
-	os.system(cmd1)
-	if os.path.exists(outdir+'/'+vcf_input.split('/')[-1].split('.vcf')[0]+'.vep.vcf')==False:
-		sys.exit('[VEP annotation] # An Error Has Occured. VEP Annotation Incomplete. Exit!')
-	return outdir+'/'+vcf_input.split('/')[-1].split('.vcf')[0]+'.vep.vcf'
 
 def appendExpandCov(args):
 	msg=False
