@@ -161,21 +161,21 @@ def DNA_mapping(readsFiles,binDir,prefixOut,sampleID,reference):
 	readsFiles_split=' '.join(readsFiles.split(','))
 	folderPath=prefixOut.rsplit('/',1)[0]
 	os.system('mkdir -p '+folderPath)
+	if os.path.exists(prefixOut+'.raw.output.bam')==False: 
+		cmd1='bwa mem -v 1 -t 8 -T 0 -v 2 -R \'@RG\\tID:'+sampleID+'\\tSM:'+sampleID+'\\tPL:ILLUMINA\\tPU:lane1\\tLB:'+sampleID+'\' '+reference+' '+readsFiles_split+' |samtools view -Shb -o '+prefixOut+'.raw.output.bam - '
+		logging.debug('[DNA-seq] Running command 1: '+cmd1+'\n')
+		os.system(cmd1)
 
-	cmd1='bwa mem -v 1 -t 8 -T 0 -R \'@RG\\tID:'+sampleID+'\\tSM:'+sampleID+'\\tPL:ILLUMINA\\tPU:lane1\\tLB:'+sampleID+'\' '+reference+' '+readsFiles_split+' |samtools view -Shb -o '+prefixOut+'.raw.output.bam - '
-	logging.debug('[DNA-seq] Running command 1: '+cmd1+'\n')
-	os.system(cmd1)
+	if os.path.exists(prefixOut+'.sorted.output.bam')==False: 
+		cmd2=JAVA8+' -jar '+binDir+'/picard.jar SortSam QUIET=true VERBOSITY=ERROR CREATE_INDEX=true INPUT='+prefixOut+'.raw.output.bam OUTPUT='+prefixOut+'.sorted.output.bam SORT_ORDER=coordinate VALIDATION_STRINGENCY=STRICT'
+		logging.debug('[DNA-seq] Running command 2: '+cmd2+'\n')
+		os.system(cmd2)
+	if os.path.exists(prefixOut+'.merged.sorted.output.bam')==False:
+		cmd3=JAVA8+' -jar '+binDir+'/picard.jar MergeSamFiles QUIET=true VERBOSITY=ERROR ASSUME_SORTED=false CREATE_INDEX=true INPUT='+prefixOut+'.sorted.output.bam MERGE_SEQUENCE_DICTIONARIES=false OUTPUT='+prefixOut+'.merged.sorted.output.bam SORT_ORDER=coordinate USE_THREADING=true VALIDATION_STRINGENCY=STRICT'
+		logging.debug('[DNA-seq] Running command 3: '+cmd3+'\n')
+		os.system(cmd3)
 
-	cmd2=JAVA8+' -jar '+binDir+'/picard.jar SortSam QUIET=true CREATE_INDEX=true INPUT='+prefixOut+'.raw.output.bam OUTPUT='+prefixOut+'.sorted.output.bam SORT_ORDER=coordinate VALIDATION_STRINGENCY=STRICT'
-	logging.debug('[DNA-seq] Running command 2: '+cmd2+'\n')
-	os.system(cmd2)
-
-	
-	cmd3=JAVA8+' -jar '+binDir+'/picard.jar MergeSamFiles QUIET=true ASSUME_SORTED=false CREATE_INDEX=true INPUT='+prefixOut+'.sorted.output.bam MERGE_SEQUENCE_DICTIONARIES=false OUTPUT='+prefixOut+'.merged.sorted.output.bam SORT_ORDER=coordinate USE_THREADING=true VALIDATION_STRINGENCY=STRICT'
-	logging.debug('[DNA-seq] Running command 3: '+cmd3+'\n')
-	os.system(cmd3)
-
-	cmd4=JAVA8+' -jar '+binDir+'/picard.jar MarkDuplicates QUIET=true CREATE_INDEX=true VALIDATION_STRINGENCY=STRICT INPUT='+prefixOut+'.merged.sorted.output.bam O='+prefixOut+'.mkdup.merged.sorted.output.bam M='+prefixOut+'.mkdup.merged.sorted.output.txt'
+	cmd4=JAVA8+' -jar '+binDir+'/picard.jar MarkDuplicates QUIET=true VERBOSITY=ERROR CREATE_INDEX=true VALIDATION_STRINGENCY=STRICT INPUT='+prefixOut+'.merged.sorted.output.bam O='+prefixOut+'.mkdup.merged.sorted.output.bam M='+prefixOut+'.mkdup.merged.sorted.output.txt'
 	logging.debug('[DNA-seq] Running command 4: '+cmd4+'\n')
 	os.system(cmd4)
 

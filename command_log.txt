@@ -12,11 +12,14 @@ samtools sort -n aln.bam aln.qsort
 4. Mapping 
 # Mutect2 is slow and relatively low sensitivity until GATK 4. (before I figure out scatter gather parallelism.) nct will lead to non-deterministic result.
 # VarScan 2 gives most result and highest sensitivity for non-low-frequent alleles.
+# MuTect —-intervals need fa.fai to create BED file
+# Need user to specify java 1.7 and 1.8 location
 
 python Fastq2Mut.py -r ~/nobackup-yxing/references.annotations/Homo_sapiens.GRCh38.dna_sm.primary_assembly.fa -i ~/nobackup-yxing/references.annotations/Mills_and_1000G_gold_standard.indels.hg38.nochr.sorted.vcf -s ~/nobackup-yxing/references.annotations/Homo_sapiens_assembly38.dbsnp.nochr.sorted.vcf -d ~/bin/ -p /u/nobackup/yxing/NOBACKUP/panyang/pipeline_test.Apr9 --snv-calling-method consensus ~/scratch/panyang/test_fastq/test.DNA.case.1.fq.gz,~/scratch/panyang/test_fastq/test.DNA.case.2.fq.gz ~/scratch/panyang/test_fastq/test.DNA.ctrl.1.fq.gz,~/scratch/panyang/test_fastq/test.DNA.ctrl.2.fq.gz
 
+
 Fastq2Mut:
-Memory: bwa 15G, multiprocessing/threading; picard sort 22G,merge 2G, markDuplicates 46G, multiprocess&threading; varscan, 3G
+Memory: bwa 15G, multiprocessing/threading; picard sort 22G,merge 2G, markDuplicates 46G, multiprocess&threading; varscan, 3G; MuSE, 1G; MuTect 10G/90G
 
 
 bam-readcount -f ~/nobackup-yxing/STAR.reference/Homo_sapiens.GRCh38.dna_sm.primary_assembly.fa -w 1 -l ~/NeoEpitope/varscan.positions Aligned.sortedByCoord.out.bam>~/NeoEpitope/RNA.readcount
