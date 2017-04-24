@@ -162,7 +162,7 @@ def DNA_mapping(readsFiles,binDir,prefixOut,sampleID,reference):
 	folderPath=prefixOut.rsplit('/',1)[0]
 	os.system('mkdir -p '+folderPath)
 	if os.path.exists(prefixOut+'.raw.output.bam')==False: 
-		cmd1='bwa mem -v 1 -t 8 -T 0 -v 2 -R \'@RG\\tID:'+sampleID+'\\tSM:'+sampleID+'\\tPL:ILLUMINA\\tPU:lane1\\tLB:'+sampleID+'\' '+reference+' '+readsFiles_split+' |samtools view -Shb -o '+prefixOut+'.raw.output.bam - '
+		cmd1='bwa mem -t 8 -T 0 -v 2 -R \'@RG\\tID:'+sampleID+'\\tSM:'+sampleID+'\\tPL:ILLUMINA\\tPU:lane1\\tLB:'+sampleID+'\' '+reference+' '+readsFiles_split+' |samtools view -Shb -o '+prefixOut+'.raw.output.bam - '
 		logging.debug('[DNA-seq] Running command 1: '+cmd1+'\n')
 		os.system(cmd1)
 
@@ -207,7 +207,7 @@ logging.basicConfig(level=logging.DEBUG,
 #Step 1
 logging.debug('[DNA-seq] # Start DNA mapping.')
 print '[DNA-seq] # Start DNA mapping.'
-if os.path.exists(outPath+sampleID+'.case/case.mkdup.merged.sorted.output.bam')==False and os.path.exists(outPath+sampleID+'.ctrl/ctrl.mkdup.merged.sorted.output.bam')==False:
+if os.path.exists(outPath+sampleID+'.case/case.mkdup.merged.sorted.output.bam')==False or os.path.exists(outPath+sampleID+'.ctrl/ctrl.mkdup.merged.sorted.output.bam')==False:
 	
 	mappings=[]
 	mappings.append(mp.Process(target=DNA_mapping,args=(args.readsFilesCase,jarPath,outPath+sampleID+'.case/case',sampleID, args.reference)))
@@ -217,12 +217,12 @@ if os.path.exists(outPath+sampleID+'.case/case.mkdup.merged.sorted.output.bam')=
 	mappings[0].join()
 	mappings[1].join()
 
-	if os.path.exists(outPath+sampleID+'.case/case.mkdup.merged.sorted.output.bam')==False and os.path.exists(outPath+sampleID+'.ctrl/ctrl.mkdup.merged.sorted.output.bam')==False:
+	if os.path.exists(outPath+sampleID+'.case/case.mkdup.merged.sorted.output.bam')==False or os.path.exists(outPath+sampleID+'.ctrl/ctrl.mkdup.merged.sorted.output.bam')==False:
 		sys.exit('[DNA-seq] # An Error Occured. DNA mapping Incomplete. Exit!')
-	os.system('rm '+outPath+sampleID+'.case/case.merged.sorted.output.bam')
-	os.system('rm '+outPath+sampleID+'.case/case.sorted.output.bam')
-	os.system('rm '+outPath+sampleID+'.ctrl/ctrl.merged.sorted.output.bam')
-	os.system('rm '+outPath+sampleID+'.ctrl/ctrl.sorted.output.bam')
+	# os.system('rm '+outPath+sampleID+'.case/case.merged.sorted.output.bam')
+	# os.system('rm '+outPath+sampleID+'.case/case.sorted.output.bam')
+	# os.system('rm '+outPath+sampleID+'.ctrl/ctrl.merged.sorted.output.bam')
+	# os.system('rm '+outPath+sampleID+'.ctrl/ctrl.sorted.output.bam')
 
 else:
 	logging.debug('[DNA-seq] # Skipped DNA mapping.')
@@ -233,7 +233,7 @@ else:
 logging.debug('[DNA-seq] # GATK bam refining - Indel.')
 print '[DNA-seq] # GATK bam refining - Indel.'
 os.system('mkdir -p '+outPath+sampleID)
-if os.path.exists(outPath+sampleID+'.case/case.idrealn.mkdup.merged.sorted.output.bam')==False and os.path.exists(outPath+sampleID+'.ctrl/ctrl.idrealn.mkdup.merged.sorted.output.bam')==False:
+if os.path.exists(outPath+sampleID+'.case/case.idrealn.mkdup.merged.sorted.output.bam')==False or os.path.exists(outPath+sampleID+'.ctrl/ctrl.idrealn.mkdup.merged.sorted.output.bam')==False:
 
 	cmd5=JAVA8+' -jar '+jarPath+'/GenomeAnalysisTK.jar -T RealignerTargetCreator -nt 8 -R '+args.reference+' -known '+args.known_indels+' -I '+outPath+sampleID+'.case/case.mkdup.merged.sorted.output.bam -I '+outPath+sampleID+'.ctrl/ctrl.mkdup.merged.sorted.output.bam -o '+outPath+sampleID+'/realign_target.intervals'
 	logging.debug('[DNA-seq] Running command 5: '+cmd5+'\n')
@@ -250,7 +250,7 @@ if os.path.exists(outPath+sampleID+'.case/case.idrealn.mkdup.merged.sorted.outpu
 
 	os.system('mv '+outPath+sampleID+'/output.map '+outPath+sampleID+'/output.map_USED')
 
-	if os.path.exists(outPath+sampleID+'.case/case.idrealn.mkdup.merged.sorted.output.bam')==False and os.path.exists(outPath+sampleID+'.ctrl/ctrl.idrealn.mkdup.merged.sorted.output.bam')==False:
+	if os.path.exists(outPath+sampleID+'.case/case.idrealn.mkdup.merged.sorted.output.bam')==False or os.path.exists(outPath+sampleID+'.ctrl/ctrl.idrealn.mkdup.merged.sorted.output.bam')==False:
 		sys.exit('[DNA-seq] # An Error Occured. GATK bam refining - Indel Incomplete. Exit!')
 	#os.system('rm '+outPath+sampleID+'.case/case.mkdup.merged.sorted.output.bam')
 	#os.system('rm '+outPath+sampleID+'.ctrl/ctrl.mkdup.merged.sorted.output.bam')
@@ -262,7 +262,7 @@ else:
 logging.debug('[DNA-seq] # GATK bam refining - SNP.')
 print '[DNA-seq] # GATK bam refining - SNP.'
 
-if os.path.exists(outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam')==False and os.path.exists(outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam')==False:
+if os.path.exists(outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam')==False or os.path.exists(outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam')==False:
 	
 	recalibratings=[]
 	recalibratings.append(mp.Process(target=BRSQ,args=(args.reference,jarPath,outPath+sampleID+'.case/case',args.known_snps)))
@@ -272,7 +272,7 @@ if os.path.exists(outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.
 	recalibratings[0].join()
 	recalibratings[1].join()
 
-	if os.path.exists(outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam')==False and os.path.exists(outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam')==False:
+	if os.path.exists(outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam')==False or os.path.exists(outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam')==False:
 		sys.exit('[DNA-seq] # An Error Occured. GATK bam refining - SNP Incomplete. Exit!')
 	#os.system('rm '+outPath+sampleID+'.case/case.idrealn.mkdup.merged.sorted.output.bam')
 	#os.system('rm '+outPath+sampleID+'.ctrl/ctrl.idrealn.mkdup.merged.sorted.output.bam')
