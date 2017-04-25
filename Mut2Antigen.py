@@ -1,4 +1,5 @@
 import sys, argparse, subprocess, csv, re, numpy, datetime, os, uuid
+import multiprocessing as mp
 
 #python Mut2Antigen.py --cov-site-dna example_data/snvs.bam_readcount --exp-gene-rna example_data/genes.fpkm_tracking example_data/input.vcf
 #python Mut2Antigen.py --step 50 -a HLA-A*01:01,HLA-A*02:01,HLA-B*57:01,HLA-B*15:01,HLA-C*06:02,HLA-C*03:04 --exp-gene-rna neoantigen_2899/genes.fpkm_tracking --exp-isoform-rna neoantigen_2899/isoforms.fpkm_tracking --cov-site-dna neoantigen_2899/DNA.readcount --cov-site-rna neoantigen_2899/RNA.readcount neoantigen_2899/neoantigen_2899.snp.vep.vcf
@@ -6,6 +7,13 @@ import sys, argparse, subprocess, csv, re, numpy, datetime, os, uuid
 
 now = datetime.datetime.now()
 ID = str(uuid.uuid4()).split('-')[0]
+
+#VEP settings
+PLUGIN_PATH='~/nobackup-yxing/.vep/Plugins/'
+CACHE_PATH='~/nobackup-yxing/.vep/'
+VEP_PATH='/u/home/p/panyang/nobackup-yxing/ensembl-vep-release-88'
+
+
 def getTerminalSize():
 	env = os.environ
 	def ioctl_GWINSZ(fd):
@@ -55,13 +63,8 @@ def fileLen(fin):
 			pass
 	return i
 
-def vcfAnnotation(vcf_input, outdir):
-	pluginpath='~/nobackup-yxing/.vep/Plugins/'
-	veppath='~/nobackup-yxing/variant_effect_predictor'
-	print '# Run VEP annotation.'
-	cmd1='perl '+veppath+'/variant_effect_predictor.pl --input_file '+vcf_input+' --format vcf --output_file '+outdir+'/'+vcf_input.split('/')[-1].split('.vcf')[0]+'.vep.vcf --vcf --symbol --terms SO --plugin Downstream --plugin Wildtype --dir_plugins '+pluginpath+' --cache --uniprot --canonical -hgvs --offline'
-	#cmd1='perl '+veppath+'/vep --dir [dir] --input_file '+vcf_input+' --format vcf --output_file '+outdir+'/'+vcf_input.split('/')[-1].split('.vcf')[0]+'.vep.vcf --vcf --symbol --terms SO --plugin Downstream --plugin Wildtype --dir_plugins '+pluginpath+' --cache --uniprot --canonical -hgvs --offline'
-	#'./vep --species homo_sapiens --assembly GRCh37 --offline --dir_cache ../ --input_file ~/VCF4neoantigen/input.vcf --vcf --dir_plugins ~/.vep/Plugins/ --plugin Downstream --plugin Wildtype'
+def vcfAnnotation(vcf_input, outdir, assembly):
+	cmd1=VEP_PATH+'/vep --species homo_sapiens --assembly '+assembly+' --offline --dir_cache '+CACHE_PATH+' --dir_plugins '+PLUGIN_PATH+' --input_file '+vcf_input+' --vcf --symbol --terms SO --plugin Downstream --plugin Wildtype --uniprot --canonical -hgvs --output_file '+outdir+'/'+vcf_input.split('/')[-1].split('.vcf')[0]+'.vep.vcf'
 	os.system(cmd1)
 	if os.path.exists(outdir+'/'+vcf_input.split('/')[-1].split('.vcf')[0]+'.vep.vcf')==False:
 		sys.exit('[VEP annotation] # An Error Has Occured. VEP Annotation Incomplete. Exit!')
@@ -90,34 +93,37 @@ def seqPred(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict):
 		process = subprocess.Popen(args, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		stdout, stderr = process.communicate()
 		stdout_total+=[stdout]
-		
-	return [parsePred(item) for item in stdout_total]
+	return [parsePred(item.rstrip().splitlines()) for item in stdout_total]
 
-def localIEDBCommand(iedb_path, hla_allele, epitope_len):
-	cmd = 'python '+iedb_path+'/predict_binding.py IEDB_recommended '+hla_allele+' '+epitope_len+' tmp.fasta'
-	cmds = cmd.split()
-	process=subprocess.Popen(cmds, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-	stdout, stderr = process.communicate()
-	return stdout
+def localIEDBCommand(iedb_path, hla_allele, epitope_len, outdir):
+	cmd = 'python '+iedb_path+'/predict_binding.py IEDB_recommended '+hla_allele+' '+epitope_len+' '+outdir+'/tmp.fasta > '+outdir+'/tmp_'+hla_allele.replace('*','_').replace(':','_')+'_'+epitope_len+'_iedb.txt'
+	os.system(cmd)
 
-def seqPredLocal(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict, iedb_path):
-	stdout_total=[]
-	with open('tmp.fasta', 'w') as fw:
+def seqPredLocal(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict, iedb_path, outdir):
+	with open(outdir+'/tmp.fasta', 'w') as fw:
 		for seq in prot_seq_list:
+			if seq.find('X')!=-1 or len(seq)<8:
+				continue
 			fw.writelines('>seq\n'+seq+'\n')
+	predicting=[]
+	n=0
+	file_list=[]
 	for hla_allele in hla_allele_list:
 		for epitope_len in epitope_len_list:
-			stdout=localIEDBCommand(iedb_path, hla_allele, epitope_len)
-			if stdout.startswith('Usage'):
-				print epitope_len,hla_allele
-				sys.exit('err')
-			stdout_total+=[stdout]
-	os.system('rm tmp.fasta')
-	return [parsePred(item) for item in stdout_total]
+			os.system('rm -f '+outdir+'/tmp_'+hla_allele.replace('*','_').replace(':','_')+'_'+epitope_len+'_iedb.txt')
+			file_list.append(outdir+'/tmp_'+hla_allele.replace('*','_').replace(':','_')+'_'+epitope_len+'_iedb.txt')
+			predicting.append(mp.Process(target=localIEDBCommand,args=(iedb_path, hla_allele, epitope_len, outdir)))
+			predicting[n].start()
+			n+=1
+	for i in range(0,n):
+		predicting[i].join()
+	parsed_dict=[parsePred(open(tmp_file)) for tmp_file in file_list]
+	os.system('rm -f '+outdir+'/tmp*')
+	return parsed_dict
 
 def parsePred(stdout):
 	ref_dict={}
-	ref_out=csv.DictReader(stdout.rstrip().splitlines(),delimiter='\t')
+	ref_out=csv.DictReader(stdout,delimiter='\t')
 	for r in ref_out:
 		ic50=[k for k in r.keys() if k.find('ic50')!=-1]
 		p = re.compile('\d+(\.\d+)?')
@@ -139,6 +145,36 @@ def findCSQNum(info):
 		return csq_num
 	else:
 		sys.exit('# VCF file annotation error. Exit!')
+
+def frameshiftPred(ls, annotation, iedb_path, mhc_type_dict, hla_allele_list, epitope_len_list, ic50_cut_off, fout, fout_seq):
+	if ls[0].startswith('chr'):
+		dna_pos_fs=ls[0]+':'+ls[1]
+	else:
+		dna_pos_fs='chr'+ls[0]+':'+ls[1]
+	dna_var_fs=ls[3]+'/'+ls[4]
+	gene_name_fs=annotation['SYMBOL']
+	gene_ac_fs=annotation['Gene']
+	trnscrpt_ac_fs=annotation['Feature']
+	prot_ac_fs=annotation['HGVSp'].split(':')[0]
+	prot_var_fs=annotation['HGVSp'].split(':')[1].split('.')[1]
+	prot_pos_fs=annotation['Protein_position'].split('-')[0]
+	prot_seq_ref_fs=annotation['WildtypeProtein'].strip()
+	prot_seq_mut_fs=annotation['DownstreamProtein'].strip()
+	if iedb_path:
+		pred_result_mut=seqPredLocal([prot_seq_mut_fs], hla_allele_list, epitope_len_list, mhc_type_dict, iedb_path, fout.rsplit('/',1)[0])
+	else:
+		pred_result_mut=seqPred([prot_seq_mut_fs], hla_allele_list, epitope_len_list, mhc_type_dict)
+	for i,pred_allele_result_mut in enumerate(pred_result_mut):
+		for k in pred_allele_result_mut:
+			foc='-'
+			ks=k.split('_')
+			start_pos_seq=int(ks[2])
+			allele=ks[0]
+			epitope_len=ks[3]
+			fout.write(('{}\t'*15+'{}\n').format(dna_pos_fs,dna_var_fs,gene_name_fs,gene_ac_fs,trnscrpt_ac_fs,prot_ac_fs,prot_pos_fs,prot_var_fs,start_pos_seq,epitope_len,allele,'-',pred_allele_result_mut[k][0],foc,pred_allele_result_mut[k][1].lower(),pred_allele_result_mut[k][1]))
+			if pred_allele_result_mut[k][0]>int(ic50_cut_off):
+				continue
+			fout_seq.write('>{}\n{}\n'.format(dna_pos_fs+'_'+dna_var_fs+'_'+gene_name_fs+'_'+prot_ac_fs+'_'+str(prot_pos_fs)+'_'+str(start_pos_seq)+'_'+prot_var_fs+'_'+str(epitope_len)+'_'+allele,prot_seq_mut_fs)) #FASTA with full length mutant protein sequences, let the library search algorithm to remove duplicated fragments.
 
 def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off, outdir, iedb_path):
 	# Defining varaibles 
@@ -164,56 +200,61 @@ def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off,
 		info=ls[7].split(';')
 		if csq_num==-1:
 			csq_num=findCSQNum(info)
-		csq_value = info[csq_num].split(',')[0].split('|')
-		annotation=dict(zip(csq_header,csq_value))
+		for csq_value_str in info[csq_num].split(','):
+			csq_value=csq_value_str.split('|')
+			annotation=dict(zip(csq_header,csq_value))
 
-		consequence= annotation['Consequence'].split('&')
-		if 'missense_variant' in consequence or 'inframe_insertion' in consequence or 'inframe_deletion' in consequence:
-			seq_num+=[len(dna_pos)+1]
-			if ls[0].startswith('chr'):
-				dna_pos+=[ls[0]+':'+ls[1]]
-			else:
-				dna_pos+=['chr'+ls[0]+':'+ls[1]]
-			dna_var+=[ls[3]+'/'+ls[4]]
-			gene_name+=[annotation['SYMBOL']]
-			gene_ac+=[annotation['Gene']]
-			trnscrpt_ac+=[annotation['Feature']]
-			prot_ac+=[annotation['HGVSp'].split(':')[0]]
-			prot_var+=[annotation['Amino_acids']]
-			prot_vars=prot_var[-1].split('/')
-			[ref_aa,mut_aa]=prot_vars
-			if prot_vars[1]=='-': #handle pure insertion
-				mut_aa=''
-			if prot_vars[0]=='-': #handle pure deletion
-				ref_aa=''
-			prot_pos+=[annotation['Protein_position'].split('-')[0]]
-			prot_seq_ref+=[annotation['WildtypeProtein'].strip()]
-			prot_seq_mut+=[annotation['WildtypeProtein'].strip()[:int(prot_pos[-1])-1]+mut_aa.lower()+annotation['WildtypeProtein'].strip()[int(prot_pos[-1])-1+len(ref_aa):]]
-			start_pos+=[max(0,int(prot_pos[-1])-1-(peptide_len-1))]
-			end_pos=min(len(prot_seq_mut[-1]),int(prot_pos[-1])-1+(peptide_len-1)+len(mut_aa)-len(ref_aa)+1)
-			mut_seq+=[prot_seq_mut[-1][start_pos[-1]:end_pos]]
-			ref_seq+=[prot_seq_ref[-1][start_pos[-1]:end_pos]]
+			consequence= annotation['Consequence'].split('&')
+			if 'missense_variant' in consequence or 'inframe_insertion' in consequence or 'inframe_deletion' in consequence:
+				if ls[0].startswith('chr'):
+					dna_pos+=[ls[0]+':'+ls[1]]
+				else:
+					dna_pos+=['chr'+ls[0]+':'+ls[1]]
+				dna_var+=[ls[3]+'/'+ls[4]]
+				gene_name+=[annotation['SYMBOL']]
+				gene_ac+=[annotation['Gene']]
+				trnscrpt_ac+=[annotation['Feature']]
+				prot_ac+=[annotation['HGVSp'].split(':')[0]]
+				prot_var+=[annotation['Amino_acids']]
+				prot_vars=prot_var[-1].split('/')
+				[ref_aa,mut_aa]=prot_vars
+				if prot_vars[1]=='-': #handle pure insertion
+					mut_aa=''
+				if prot_vars[0]=='-': #handle pure deletion
+					ref_aa=''
+				prot_pos+=[annotation['Protein_position'].split('-')[0]]
+				prot_seq_ref+=[annotation['WildtypeProtein'].strip()]
+				prot_seq_mut+=[annotation['WildtypeProtein'].strip()[:int(prot_pos[-1])-1]+mut_aa.lower()+annotation['WildtypeProtein'].strip()[int(prot_pos[-1])-1+len(ref_aa):]]
+				start_pos+=[max(0,int(prot_pos[-1])-1-(peptide_len-1))]
+				end_pos=min(len(prot_seq_mut[-1]),int(prot_pos[-1])-1+(peptide_len-1)+len(mut_aa)-len(ref_aa)+1)
+				mut_seq+=[prot_seq_mut[-1][start_pos[-1]:end_pos]]
+				ref_seq+=[prot_seq_ref[-1][start_pos[-1]:end_pos]]
+			# elif 'frameshift_variant' in consequence:
+			# 	frameshiftPred(ls, annotation, iedb_path, mhc_type_dict, hla_allele_list, epitope_len_list, ic50_cut_off, fout, fout_seq)
+			# 	continue
 
-		if len(dna_pos)==step or file_index==fin_len-1:
-			if iedb_path:
-				pred_result_mut=seqPredLocal(mut_seq, hla_allele_list, epitope_len_list, mhc_type_dict, iedb_path)
-				pred_result_ref=seqPredLocal(ref_seq, hla_allele_list, epitope_len_list, mhc_type_dict, iedb_path)
-			else:
-				pred_result_mut=seqPred(mut_seq, hla_allele_list, epitope_len_list, mhc_type_dict)
-				pred_result_ref=seqPred(ref_seq, hla_allele_list, epitope_len_list, mhc_type_dict)
-			for i,pred_allele_result_mut in enumerate(pred_result_mut):
-				for k in pred_allele_result_mut:
-					foc=pred_allele_result_mut[k][0]/pred_result_ref[i][k][0]
-					ks=k.split('_')
-					seq_index=int(ks[1])-1
-					start_pos_seq=int(start_pos[seq_index])+int(ks[2])
-					allele=ks[0]
-					epitope_len=ks[3]
-					fout.write(('{}\t'*15+'{}\n').format(dna_pos[seq_index],dna_var[seq_index],gene_name[seq_index],gene_ac[seq_index],trnscrpt_ac[seq_index],prot_ac[seq_index],prot_pos[seq_index],prot_var[seq_index],start_pos_seq,epitope_len,allele,pred_result_ref[i][k][0],pred_allele_result_mut[k][0],foc,mut_seq[seq_index],pred_allele_result_mut[k][1]))
-					if pred_allele_result_mut[k][0]>int(ic50_cut_off):
-						continue
-					fout_seq.write('>{}\n{}\n'.format(dna_pos[seq_index]+'_'+dna_var[seq_index]+'_'+gene_name[seq_index]+'_'+prot_ac[seq_index]+'_'+str(prot_pos[seq_index])+'_'+prot_var[seq_index]+'_'+str(epitope_len)+'_'+allele,prot_seq_mut[seq_index])) #FASTA with full length mutant protein sequences, let the library search algorithm to remove duplicated fragments.
-			seq_num,dna_pos,dna_var,prot_ac,gene_name,gene_ac,trnscrpt_ac,prot_pos,prot_var,prot_seq_ref,prot_seq_mut,start_pos,mut_seq,ref_seq=([] for i in range(14))
+			if len(dna_pos)==step or file_index==fin_len-1:
+				if len(dna_pos)==0:
+					continue
+				if iedb_path:
+					pred_result_mut=seqPredLocal(mut_seq, hla_allele_list, epitope_len_list, mhc_type_dict, iedb_path, outdir)
+					pred_result_ref=seqPredLocal(ref_seq, hla_allele_list, epitope_len_list, mhc_type_dict, iedb_path, outdir)
+				else:
+					pred_result_mut=seqPred(mut_seq, hla_allele_list, epitope_len_list, mhc_type_dict)
+					pred_result_ref=seqPred(ref_seq, hla_allele_list, epitope_len_list, mhc_type_dict)
+				for i,pred_allele_result_mut in enumerate(pred_result_mut):
+					for k in pred_allele_result_mut:
+						foc=pred_allele_result_mut[k][0]/pred_result_ref[i][k][0]
+						ks=k.split('_')
+						seq_index=int(ks[1])-1
+						start_pos_seq=int(start_pos[seq_index])+int(ks[2])
+						allele=ks[0]
+						epitope_len=ks[3]
+						fout.write(('{}\t'*15+'{}\n').format(dna_pos[seq_index],dna_var[seq_index],gene_name[seq_index],gene_ac[seq_index],trnscrpt_ac[seq_index],prot_ac[seq_index],prot_pos[seq_index],prot_var[seq_index],start_pos_seq,epitope_len,allele,pred_result_ref[i][k][0],pred_allele_result_mut[k][0],foc,mut_seq[seq_index],pred_allele_result_mut[k][1]))
+						if pred_allele_result_mut[k][0]>int(ic50_cut_off):
+							continue
+						fout_seq.write('>{}\n{}\n'.format(dna_pos[seq_index]+'_'+dna_var[seq_index]+'_'+gene_name[seq_index]+'_'+prot_ac[seq_index]+'_'+str(prot_pos[seq_index])+'_'+str(start_pos_seq)+'_'+prot_var[seq_index]+'_'+str(epitope_len)+'_'+allele,prot_seq_mut[seq_index])) #FASTA with full length mutant protein sequences, let the library search algorithm to remove duplicated fragments.
+				dna_pos,dna_var,prot_ac,gene_name,gene_ac,trnscrpt_ac,prot_pos,prot_var,prot_seq_ref,prot_seq_mut,start_pos,mut_seq,ref_seq=([] for i in range(13))
 
 def appendExpandCov(args):
 	msg=False
@@ -304,9 +345,10 @@ def main():
 	parser.add_argument('-a', '--hla-allele-list', default='HLA-A*01:01,HLA-B*07:02', help='a list of HLA types. Default is HLA-A*01:01,HLA-B*01:01.')
 	parser.add_argument('-o', '--outdir', default= 'Result.'+ID, help='The output directory.')
 	parser.add_argument('--vcf-annotation', action='store_true', help='Specify local IEDB location if it is installed.')
-	parser.add_argument('--iedb', default=False, help='Specify local IEDB location if it is installed.')
+	parser.add_argument('--assembly',default='GRCh37', help='Specify the annotation version: GRCh37 or GRCh38. Default is GRCh37.')
+	parser.add_argument('--iedb_local', default=False, help='Specify local IEDB location if it is installed.')
 	parser.add_argument('--step', default=100, help='Number of entries per time sending to prediction. Default is 50.')
-	parser.add_argument('--ic50-cut-off', default=1000, help='Cut-off based on median value of concensus predicted IC50 values. Default is 1000.')
+	parser.add_argument('--ic50-cut-off', default=500, help='Cut-off based on median value of concensus predicted IC50 values. Default is 1000.')
 	parser.add_argument('--protein-ms', type=argparse.FileType('r'), help='mzML format is recommended. Currently only support library search. Quantatitive pipeline is under development.')
 	parser.add_argument('--protein-reference', default= 'data/.fasta', help='fasta format reference protein sequences. Details see MSGFPlus manu.')
 	parser.add_argument('--protein-mod', default= 'data/mod.txt', help='protein modification file needed for labeled MS data library search. Details see MSGFPlus manu.')
@@ -321,38 +363,39 @@ def main():
 	os.system('mkdir -p '+outdir)
 	if args.vcf_annotation:
 		if fin.split('/')[-1].endswith('.vep.vcf')!=True:
-			fin=vcfAnnotation(fin, outdir)
+			print str(datetime.datetime.now()),'# Run VEP annotation.'
+			fin=vcfAnnotation(fin, outdir, args.assembly)
 			print fin
 		else:
 			sys.exit('# The input VCF file seems already annotated. Please rename the file without ".vep" or remove argument "--vcf-annotation"')
 	epitope_len_list=args.epitope_len_list.split(',')
 	if min(epitope_len_list)<8:
 		sys.exit("# The request epitope length is too small. Exit.")
-	iedb_path=args.iedb
-	if args.iedb!=False:
-		iedb_path=args.iedb.rstrip('/')
+	iedb_path=args.iedb_local
+	if args.iedb_local!=False:
+		iedb_path=args.iedb_local.rstrip('/')
 	hla_allele_list=args.hla_allele_list.split(',')
 
-	print str(now),'# Searching Neoepitopes for allele types',','.join(hla_allele_list), 'with ', ','.join(epitope_len_list),'long...'
+	print str(datetime.datetime.now()),'# Searching Neoepitopes for allele types',','.join(hla_allele_list), 'with ', ','.join(epitope_len_list),'long...'
 	
 	# Step 1. Predicting the Neo-epitope by HLA binding affinity. Generating TSV and FASTA files. 
 	mutationPipeline(fin, hla_allele_list, epitope_len_list, int(args.step), args.ic50_cut_off, outdir, iedb_path)
-	print str(now),'# Finished searching and predicting. The result is saved as: '+outdir+'/'+fin.split('/')[-1]+'.step1.out \n'
+	print str(datetime.datetime.now()),'# Finished searching and predicting. The result is saved as: '+outdir+'/'+fin.split('/')[-1]+'.step1.out \n'
 
 	# Step 2 (Optional). Confirming with coverage and epxression level information. Appending to TSV.
 	if appendExpandCov(args):
-		print str(now),'# Confirming with coverage and/or expression information from DNA/RNA sequencing.'
+		print str(datetime.datetime.now()),'# Confirming with coverage and/or expression information from DNA/RNA sequencing.'
 		appendSeqInfo(args)
-		print str(now),'# Finished appending information. The result is saved as :'+outdir+'/'+fin.split('/')[-1]+'.step1.out.step2.out \n'
+		print str(datetime.datetime.now()),'# Finished appending information. The result is saved as :'+outdir+'/'+fin.split('/')[-1]+'.step1.out.step2.out \n'
   
 	# Step 3 (Optional). Searching proteome level evidence by MS data library search. Appending to TSV.
 	if args.protein_ms:
-		print str(now),'# Searching for protein evidence of predicted neo-epitopes.'
+		print str(datetime.datetime.now()),'# Searching for protein evidence of predicted neo-epitopes.'
 		custom_database = mergePeps2Database(outdir+'/'+fin.split('/')[-1]+'.step1.out.fa', args.protein_reference, outdir)
 		#print str(now),'# Running MSGFPlus for proteome data searching.. The result is saved as: '+outdir+'/'+fin.split('/')[-1]+'.step1.out '
 		#os.system('java -Xmx3500M -jar MSGFPlus.jar -s '+args.protein_ms_input+' -d '+custom_database+' -t 20ppm -protocol 2 -ti -1,2 -ntt 2 -tda 1 -inst 3 -m 1 -mod '+args.protein_mod)
 		## os.system('java -Xmx3500M -jar MSGFPlus.jar -s test.mzXML -d IPI_human_3.79.fasta -t 0.5Da,2.5Da -ntt 2 -protocol 2 -tda 1 -o testMSGFPlus.mzid -mod Mods.txt')
-		print str(now),'# Finished searching and filtering.\n'
-	print str(now),'# Completed.\n'
+		print str(datetime.datetime.now()),'# Finished searching and filtering.\n'
+	print str(datetime.datetime.now()),'# Completed.\n'
 if __name__ == '__main__':
 	main()
