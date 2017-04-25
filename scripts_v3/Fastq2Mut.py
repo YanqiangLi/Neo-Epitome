@@ -11,39 +11,39 @@ def parsing_SNV_consensus(outPath, sampleID):
 		if l.startswith('#'):
 			continue
 		ls=l.strip().split('\t')
-		mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]]=set(['VarScan2'])
+		mut_dict[ls[0]+'\t'+ls[1]+'\t'+ls[3]+'\t'+ls[4]]=set(['VarScan2'])
 	for l in open(outPath+sampleID+'/'+sampleID+'.varscan.indel.Somatic.hc.vcf'):
 		if l.startswith('#'):
 			continue
 		ls=l.strip().split('\t')
-		if mut_dict.has_key(ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]):
-			mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]].add(['VarScan2'])
+		if mut_dict.has_key(ls[0]+'\t'+ls[1]+'\t'+ls[3]+'\t'+ls[4]):
+			mut_dict[ls[0]+'\t'+ls[1]+'\t'+ls[3]+'\t'+ls[4]].add(['VarScan2'])
 		else:
-			mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]]=set(['VarScan2'])
+			mut_dict[ls[0]+'\t'+ls[1]+'\t'+ls[3]+'\t'+ls[4]]=set(['VarScan2'])
 	for l in open(outPath+sampleID+'/'+sampleID+'.muse.snp.vcf'):
 		if l.startswith('#'):
 			continue
 		ls=l.strip().split('\t')
-		if mut_dict.has_key(ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]):
-			mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]].add('MuSE')
+		if mut_dict.has_key(ls[0]+'\t'+ls[1]+'\t'+ls[3]+'\t'+ls[4]):
+			mut_dict[ls[0]+'\t'+ls[1]+'\t'+ls[3]+'\t'+ls[4]].add('MuSE')
 		else:
-			mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]]=set(['MuSE'])
+			mut_dict[ls[0]+'\t'+ls[1]+'\t'+ls[3]+'\t'+ls[4]]=set(['MuSE'])
 	for l in open(outPath+sampleID+'/'+sampleID+'.mutect.snp.txt'):
 		if l.startswith('#'):
 			continue
 		ls=l.strip().split('\t')
 		if ls[-1]=='KEEP':
-			if mut_dict.has_key(ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]):
-				mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]].add('MuTect')
+			if mut_dict.has_key(ls[0]+'\t'+ls[1]+'\t'+ls[3]+'\t'+ls[4]):
+				mut_dict[ls[0]+'\t'+ls[1]+'\t'+ls[3]+'\t'+ls[4]].add('MuTect')
 			else:
-				mut_dict[ls[0]+'_'+ls[1]+'_'+ls[3]+'_'+ls[4]]=set(['MuTect'])
+				mut_dict[ls[0]+'\t'+ls[1]+'\t'+ls[3]+'\t'+ls[4]]=set(['MuTect'])
 
 	fout=open(outPath+sampleID+'/'+sampleID+'.consensus.snv.vcf','w')
 	fout.write('##fileformat=VCFv4.0\n##source=Formated\n##phasing=none\n')
 	fout.write(('{}\t'*9+'{}\n').format('#CHROM','POS','ID','REF','ALT','QUAL','FILTER','INFO','FORMAT',sampleID))
 	for key in mut_dict.keys():
 		if len(mut_dict[key])>=2:
-			ks=key.split('_')
+			ks=key.split('\t')
 			fout.write(('{}\t'*9+'{}\n').format(ks[0],ks[1],'.',ks[2],ks[3],len(mut_dict[key]),'.','.',';'.join(mut_dict[key]),'.'))
 	fout.close()
 
