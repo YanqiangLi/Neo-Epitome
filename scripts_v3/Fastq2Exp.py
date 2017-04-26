@@ -4,9 +4,9 @@ def STAR_alignment(readsFilesCaseRNA, starGenomeDir,outDir):
 	gz=readsFilesCaseRNA.split(',')[0].endswith('gz')
 	readsFiles_split=' '.join(readsFilesCaseRNA.split(','))
 	if gz:
-		cmd1='STAR --genomeDir '+starGenomeDir+' --twopassMode Basic --readFilesIn '+readsFiles_split+' --runThreadN 6 --outFilterMultimapScoreRange 1 --outFilterMultimapNmax 20 --outFilterMismatchNmax 10 --alignIntronMax 500000 --alignMatesGapMax 1000000 --sjdbScore 2 --alignSJDBoverhangMin 1 --genomeLoad NoSharedMemory --limitBAMsortRAM 0 --outFilterMatchNminOverLread 0.33 --outFilterScoreMinOverLread 0.33 --sjdbOverhang 99 --outSAMstrandField intronMotif --outSAMattributes NH HI NM MD AS XS --outSAMunmapped Within --outSAMtype BAM SortedByCoordinate --outSAMheaderHD @HD VN:1.4 --readFilesCommand zcat --outFileNamePrefix '+outDir+'/'
+		cmd1='STAR --genomeDir '+starGenomeDir+' --twopassMode Basic --readFilesIn '+readsFiles_split+' --runThreadN 6 --outFilterMultimapScoreRange 1 --outFilterMultimapNmax 20 --outFilterMismatchNmax 10 --alignIntronMax 500000 --alignMatesGapMax 1000000 --sjdbScore 2 --alignSJDBoverhangMin 1 --genomeLoad NoSharedMemory --limitBAMsortRAM 0 --outFilterMatchNminOverLread 0.33 --outFilterScoreMinOverLread 0.33 --sjdbOverhang 100 --outSAMstrandField intronMotif --outSAMattributes NH HI NM MD AS XS --outSAMunmapped Within --outSAMtype BAM SortedByCoordinate --outSAMheaderHD @HD VN:1.4 --readFilesCommand zcat --outFileNamePrefix '+outDir+'/'
 	else:
-		cmd1='STAR --genomeDir '+starGenomeDir+' --twopassMode Basic --readFilesIn '+readsFiles_split+' --runThreadN 6 --outFilterMultimapScoreRange 1 --outFilterMultimapNmax 20 --outFilterMismatchNmax 10 --alignIntronMax 500000 --alignMatesGapMax 1000000 --sjdbScore 2 --alignSJDBoverhangMin 1 --genomeLoad NoSharedMemory --limitBAMsortRAM 0 --outFilterMatchNminOverLread 0.33 --outFilterScoreMinOverLread 0.33 --sjdbOverhang 99 --outSAMstrandField intronMotif --outSAMattributes NH HI NM MD AS XS --outSAMunmapped Within --outSAMtype BAM SortedByCoordinate --outSAMheaderHD @HD VN:1.4 --outFileNamePrefix '+outDir+'/'	
+		cmd1='STAR --genomeDir '+starGenomeDir+' --twopassMode Basic --readFilesIn '+readsFiles_split+' --runThreadN 6 --outFilterMultimapScoreRange 1 --outFilterMultimapNmax 20 --outFilterMismatchNmax 10 --alignIntronMax 500000 --alignMatesGapMax 1000000 --sjdbScore 2 --alignSJDBoverhangMin 1 --genomeLoad NoSharedMemory --limitBAMsortRAM 0 --outFilterMatchNminOverLread 0.33 --outFilterScoreMinOverLread 0.33 --sjdbOverhang 100 --outSAMstrandField intronMotif --outSAMattributes NH HI NM MD AS XS --outSAMunmapped Within --outSAMtype BAM SortedByCoordinate --outSAMheaderHD @HD VN:1.4 --outFileNamePrefix '+outDir+'/'	
 	logging.debug('[RNA-seq] Running command 1: '+cmd1+'\n')
 	os.system(cmd1)
 	
@@ -25,13 +25,11 @@ parser.add_argument('readsFilesCaseRNA',help='Tumor sample paired-end fastq file
 args = parser.parse_args()
 
 sampleID=args.sampleID.rstrip('/')
-
+os.system('mkdir -p '+args.sampleID)
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(message)s',
                     filename=sampleID+'/NeoEpitome-Fastq2Exp.log'+ str(datetime.datetime.now())+'.txt' ,
                     filemode='w')
-
-os.system('mkdir -p '+args.sampleID)
 
 logging.debug('[RNA-seq] # Start STAR 2pass alignment.')
 print '[RNA-seq] # Start STAR 2pass alignment.'
