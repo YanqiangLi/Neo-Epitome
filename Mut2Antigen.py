@@ -346,7 +346,7 @@ def main():
 	parser.add_argument('-o', '--outdir', default= 'Result.'+ID, help='The output directory.')
 	parser.add_argument('--vcf-annotation', action='store_true', help='Specify local IEDB location if it is installed.')
 	parser.add_argument('--assembly',default='GRCh37', help='Specify the annotation version: GRCh37 or GRCh38. Default is GRCh37.')
-	parser.add_argument('--iedb_local', default=False, help='Specify local IEDB location if it is installed.')
+	parser.add_argument('--iedb-local', default=False, help='Specify local IEDB location if it is installed.')
 	parser.add_argument('--step', default=100, help='Number of entries per time sending to prediction. Default is 50.')
 	parser.add_argument('--ic50-cut-off', default=500, help='Cut-off based on median value of concensus predicted IC50 values. Default is 1000.')
 	parser.add_argument('--protein-ms', type=argparse.FileType('r'), help='mzML format is recommended. Currently only support library search. Quantatitive pipeline is under development.')

@@ -44,7 +44,8 @@ def parsing_SNV_consensus(outPath, sampleID):
 	for key in mut_dict.keys():
 		if len(mut_dict[key])>=2:
 			ks=key.split('\t')
-			fout.write(('{}\t'*9+'{}\n').format(ks[0],ks[1],'.',ks[2],ks[3],len(mut_dict[key]),'.','.',';'.join(mut_dict[key]),'.'))
+			if ks[0].find('_')==-1:
+				fout.write(('{}\t'*9+'{}\n').format(ks[0],ks[1],'.',ks[2],ks[3],len(mut_dict[key]),'.','.',';'.join(mut_dict[key]),'.'))
 	fout.close()
 
 def create_intervals(outPath, sampleID, reference):
@@ -142,7 +143,7 @@ def SNP_calling_VarScan2(outPath, sampleID, reference, jarPath):
 
 	if os.path.exists(outPath+sampleID+'/'+sampleID+'.varscan.snp.vcf')==False:
 		sys.exit('[DNA-seq] # An Error Occured. VarScan Incomplete. Exit!')
-	os.system('rm '+outPath+sampleID+'/intermediate.pileup')
+	os.system('rm -f '+outPath+sampleID+'/intermediate.pileup')
 	logging.debug('[DNA-seq] # VarScan SNV calling completed.')
 	print '[DNA-seq] # VarScan SNV calling completed.'
 
