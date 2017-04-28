@@ -11,7 +11,7 @@ def STAR_alignment(readsFilesCaseRNA, starGenomeDir,outDir):
 	os.system(cmd1)
 	
 def cufflinks(gtf, sampleID):
-	cmd2='cufflinks --multi-read-correct -p 8 --GTF '+gtf+' -o '+sampleID+'/cufflinks '+sampleID+'/Aligned.sortedByCoord.out.bam'
+	cmd2='cufflinks --multi-read-correct -p 16 --GTF '+gtf+' -o '+sampleID+'/cufflinks '+sampleID+'/Aligned.sortedByCoord.out.bam'
 	logging.debug('[RNA-seq] Running command 2: '+cmd2+'\n')
 	os.system(cmd2)
 
@@ -50,5 +50,6 @@ if os.path.exists(sampleID+'/cufflinks/genes.fpkm_tracking')==False:
 else:
 	logging.debug('[RNA-seq] # Skipped cufflinks.')
 	print '[RNA-seq] # Skipped cufflinks.'
+
 logging.debug('[RNA-seq] # Completed.')
 print '[RNA-seq] # Completed.'
