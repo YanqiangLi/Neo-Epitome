@@ -21,8 +21,8 @@ def calculating_cov(reference, outdir, tumor_bam, data_type):
     print '[Bam2Cov] Running command: '+cmd1
 
 def main():
-    parser = argparse.ArgumentParser(description='NeoEpitome-Mut2Antigen (v1.0)')
-    parser.add_argument('vcf_input', help='input annotated somatic mutation VCF file.')
+    parser = argparse.ArgumentParser(description='NeoEpitome-BAM2Cov (v1.0)')
+    parser.add_argument('vcf_input', help='input somatic mutation VCF file.')
     parser.add_argument('-p','--sampleID', default='NeoEpitomeOut', help='Sample ID will be used for output folder name and reads group name.')
     parser.add_argument('-r','--reference',help='Reference genome used for short reads mapping and GATK realigments.')
     parser.add_argument('--tumor-dna-bam', help='BAM file for tumor DNA seq.')
