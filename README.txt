@@ -126,10 +126,10 @@ usage: BAM2Cov.py [-h] [-p SAMPLEID] [-r REFERENCE]
                   [--tumor-rna-bam TUMOR_RNA_BAM]
                   vcf_input
 
-NeoEpitome-Mut2Antigen (v1.0)
+NeoEpitome-BAM2Cov (v1.0)
 
 positional arguments:
-  vcf_input             input annotated somatic mutation VCF file.
+  vcf_input             input somatic mutation VCF file.
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -143,6 +143,7 @@ optional arguments:
                         BAM file for tumor DNA seq.
   --tumor-rna-bam TUMOR_RNA_BAM
                         BAM file for tumor RNA seq.
+
 
 
                     
