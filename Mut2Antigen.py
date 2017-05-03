@@ -176,7 +176,7 @@ def frameshiftPred(ls, annotation, iedb_path, mhc_type_dict, hla_allele_list, ep
 				continue
 			fout_seq.write('>{}\n{}\n'.format(dna_pos_fs+'_'+dna_var_fs+'_'+gene_name_fs+'_'+prot_ac_fs+'_'+str(prot_pos_fs)+'_'+str(start_pos_seq)+'_'+prot_var_fs+'_'+str(epitope_len)+'_'+allele,prot_seq_mut_fs)) #FASTA with full length mutant protein sequences, let the library search algorithm to remove duplicated fragments.
 
-def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off, outdir, iedb_path):
+def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off, outdir, iedb_path, fs):
 	# Defining varaibles 
 	fin_len=fileLen(fin)
 	peptide_len = max(map(int,epitope_len_list))
@@ -229,9 +229,9 @@ def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off,
 				end_pos=min(len(prot_seq_mut[-1]),int(prot_pos[-1])-1+(peptide_len-1)+len(mut_aa)-len(ref_aa)+1)
 				mut_seq+=[prot_seq_mut[-1][start_pos[-1]:end_pos]]
 				ref_seq+=[prot_seq_ref[-1][start_pos[-1]:end_pos]]
-			# elif 'frameshift_variant' in consequence:
-			# 	frameshiftPred(ls, annotation, iedb_path, mhc_type_dict, hla_allele_list, epitope_len_list, ic50_cut_off, fout, fout_seq)
-			# 	continue
+			elif 'frameshift_variant' in consequence and fs==True:
+				frameshiftPred(ls, annotation, iedb_path, mhc_type_dict, hla_allele_list, epitope_len_list, ic50_cut_off, fout, fout_seq)
+				continue
 
 			if len(dna_pos)==step or file_index==fin_len-1:
 				if len(dna_pos)==0:
@@ -291,7 +291,7 @@ def parseCoverageFile(bam_readcount_file):
 def parseQuantFile(fin_Quant_gene_case):
 	exp={}
 	for l in csv.DictReader(fin_Quant_gene_case,dialect='excel-tab'):
-		exp[l['tracking_id']] = l['FPKM']
+		exp[l['tracking_id'].split('.')[0]] = l['FPKM']
 	return exp
 
 def appendSeqInfo(args):
@@ -349,6 +349,7 @@ def main():
 	parser.add_argument('--iedb-local', default=False, help='Specify local IEDB location if it is installed.')
 	parser.add_argument('--step', default=100, help='Number of entries per time sending to prediction. Default is 50.')
 	parser.add_argument('--ic50-cut-off', default=500, help='Cut-off based on median value of concensus predicted IC50 values. Default is 1000.')
+	parser.add_argument('--frame-shift',action='store_true', help='Parse and predict frame-shift mutation outcomes.')
 	parser.add_argument('--protein-ms', type=argparse.FileType('r'), help='mzML format is recommended. Currently only support library search. Quantatitive pipeline is under development.')
 	parser.add_argument('--protein-reference', default= 'data/.fasta', help='fasta format reference protein sequences. Details see MSGFPlus manu.')
 	parser.add_argument('--protein-mod', default= 'data/mod.txt', help='protein modification file needed for labeled MS data library search. Details see MSGFPlus manu.')
@@ -379,8 +380,11 @@ def main():
 	print str(datetime.datetime.now()),'# Searching Neoepitopes for allele types',','.join(hla_allele_list), 'with ', ','.join(epitope_len_list),'long...'
 	
 	# Step 1. Predicting the Neo-epitope by HLA binding affinity. Generating TSV and FASTA files. 
-	mutationPipeline(fin, hla_allele_list, epitope_len_list, int(args.step), args.ic50_cut_off, outdir, iedb_path)
-	print str(datetime.datetime.now()),'# Finished searching and predicting. The result is saved as: '+outdir+'/'+fin.split('/')[-1]+'.step1.out \n'
+	if os.path.exists(outdir+'/'+fin.split('/')[-1]+'.step1.out')==False:
+		mutationPipeline(fin, hla_allele_list, epitope_len_list, int(args.step), args.ic50_cut_off, outdir, iedb_path, args.frame_shift)
+		print str(datetime.datetime.now()),'# Finished searching and predicting. The result is saved as: '+outdir+'/'+fin.split('/')[-1]+'.step1.out \n'
+	else:
+		print str(datetime.datetime.now()),'# Skipped searching and predicting. The file alraedy exists: '+outdir+'/'+fin.split('/')[-1]+'.step1.out \n'
 
 	# Step 2 (Optional). Confirming with coverage and epxression level information. Appending to TSV.
 	if appendExpandCov(args):
@@ -396,6 +400,6 @@ def main():
 		#os.system('java -Xmx3500M -jar MSGFPlus.jar -s '+args.protein_ms_input+' -d '+custom_database+' -t 20ppm -protocol 2 -ti -1,2 -ntt 2 -tda 1 -inst 3 -m 1 -mod '+args.protein_mod)
 		## os.system('java -Xmx3500M -jar MSGFPlus.jar -s test.mzXML -d IPI_human_3.79.fasta -t 0.5Da,2.5Da -ntt 2 -protocol 2 -tda 1 -o testMSGFPlus.mzid -mod Mods.txt')
 		print str(datetime.datetime.now()),'# Finished searching and filtering.\n'
-	print str(datetime.datetime.now()),'# Completed.\n'
+	print str(datetime.datetime.now()),'# Neo-Epitome Detection is Completed.\n'
 if __name__ == '__main__':
 	main()
