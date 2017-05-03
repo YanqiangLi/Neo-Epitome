@@ -1,10 +1,10 @@
-## Dependency:
+##Dependency:
 1. Python 2.7 (biopython, numpy)
 2. R
 3. BWA,Samtools,
 3. IEDB (optional)
 
-## VCF mode:
+##VCF mode:
 usage: Mut2Antigen.py [-h] [-j JUNCTION_INPUT] [-e EPITOPE_LEN_LIST]
                       [-a HLA_ALLELE_LIST] [-o OUTDIR] [--vcf-annotation]
                       [--assembly ASSEMBLY] [--iedb-local IEDB_LOCAL]
@@ -66,7 +66,7 @@ optional arguments:
 
 
 
-## FASTQ mode:
+##FASTQ mode:
 
 usage: Fastq2Mut.py [-h] [-r REFERENCE] [-i KNOWN_INDELS] [-s KNOWN_SNPS]
                     [-d BINDIR] [-p SAMPLEID]
@@ -100,7 +100,50 @@ optional arguments:
                         SNV calling method can be set as VarScan2, MuTect,
                         MuSE, or consensus of the three. Default is VarScan2.
 
-              
+ 
+ usage: Fastq2Exp.py [-h] [--starGenomeDir STARGENOMEDIR] [--gtf GTF]
+                    [-p SAMPLEID]
+                    readsFilesCaseRNA
+
+NeoEpitome-Fastq2Mut (v1.0)
+
+positional arguments:
+  readsFilesCaseRNA     Tumor sample paired-end fastq files seperated by ",".
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --starGenomeDir STARGENOMEDIR
+                        Reference genome used for short reads mapping and GATK
+                        realigments.
+  --gtf GTF
+  -p SAMPLEID, --sampleID SAMPLEID
+                        Sample ID will be used for output folder name and
+                        reads group name.
+
+
+usage: BAM2Cov.py [-h] [-p SAMPLEID] [-r REFERENCE]
+                  [--tumor-dna-bam TUMOR_DNA_BAM]
+                  [--tumor-rna-bam TUMOR_RNA_BAM]
+                  vcf_input
+
+NeoEpitome-Mut2Antigen (v1.0)
+
+positional arguments:
+  vcf_input             input annotated somatic mutation VCF file.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p SAMPLEID, --sampleID SAMPLEID
+                        Sample ID will be used for output folder name and
+                        reads group name.
+  -r REFERENCE, --reference REFERENCE
+                        Reference genome used for short reads mapping and GATK
+                        realigments.
+  --tumor-dna-bam TUMOR_DNA_BAM
+                        BAM file for tumor DNA seq.
+  --tumor-rna-bam TUMOR_RNA_BAM
+                        BAM file for tumor RNA seq.
+
 
                     
 Output format:
