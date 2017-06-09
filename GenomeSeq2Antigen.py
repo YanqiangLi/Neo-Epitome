@@ -159,6 +159,16 @@ def mhcPredType(mhc_type_dict, hla_allele):
 			return 'mhcii'
 	else:
 		sys.exit("# Unsupported HLA type: "+hla_allele+". Exit! ")
+
+def parsePred(stdout):
+	ref_dict={}
+	ref_out=csv.DictReader(stdout,delimiter='\t')
+	for r in ref_out:
+		ic50=[k for k in r.keys() if k.find('ic50')!=-1]
+		p = re.compile('\d+(\.\d+)?')
+		ic50_value=[float(r[k]) for k in ic50 if p.match(r[k]) != None]
+		ref_dict[r['allele']+'_'+r['seq_num']+'_'+r['start']+'_'+r['length']]=[numpy.median(ic50_value),r['peptide']]
+	return ref_dict
 		
 def seqPred(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict):
 	prot_seq= '%0A'.join('%3Epredict'+str(i)+'%0A'+seq for i,seq in enumerate(prot_seq_list))
@@ -196,15 +206,6 @@ def seqPredLocal(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict, 
 	parsed_dict=[parsePred(open(tmp_file)) for tmp_file in file_list]
 	return parsed_dict
 
-def parsePred(stdout):
-	ref_dict={}
-	ref_out=csv.DictReader(stdout,delimiter='\t')
-	for r in ref_out:
-		ic50=[k for k in r.keys() if k.find('ic50')!=-1]
-		p = re.compile('\d+(\.\d+)?')
-		ic50_value=[float(r[k]) for k in ic50 if p.match(r[k]) != None]
-		ref_dict[r['allele']+'_'+r['seq_num']+'_'+r['start']+'_'+r['length']]=[numpy.median(ic50_value),r['peptide']]
-	return ref_dict
 
 
 # def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off, outdir, iedb_path, fs):
@@ -231,6 +232,7 @@ def parsePred(stdout):
 # 					continue
 # 				fout_seq.write('>{}\n{}\n'.format(dna_pos[seq_index]+'_'+dna_var[seq_index]+'_'+gene_name[seq_index]+'_'+prot_ac[seq_index]+'_'+str(prot_pos[seq_index])+'_'+str(start_pos_seq)+'_'+prot_var[seq_index]+'_'+str(epitope_len)+'_'+allele,prot_seq_mut[seq_index])) #FASTA with full length mutant protein sequences, let the library search algorithm to remove duplicated fragments.
 # 		dna_pos,dna_var,prot_ac,gene_name,gene_ac,trnscrpt_ac,prot_pos,prot_var,prot_seq_ref,prot_seq_mut,start_pos,mut_seq,ref_seq=([] for i in range(13))
+
 header=''
 out_prefix=sys.argv[2].strip('/')
 if os.path.exists(out_prefix)==False:

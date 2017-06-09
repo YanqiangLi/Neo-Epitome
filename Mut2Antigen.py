@@ -83,6 +83,16 @@ def mhcPredType(mhc_type_dict, hla_allele):
 			return 'mhcii'
 	else:
 		sys.exit("# Unsupported HLA type: "+hla_allele+". Exit! ")
+
+def parsePred(stdout):
+	ref_dict={}
+	ref_out=csv.DictReader(stdout,delimiter='\t')
+	for r in ref_out:
+		ic50=[k for k in r.keys() if k.find('ic50')!=-1]
+		p = re.compile('\d+(\.\d+)?')
+		ic50_value=[float(r[k]) for k in ic50 if p.match(r[k]) != None]
+		ref_dict[r['allele']+'_'+r['seq_num']+'_'+r['start']+'_'+r['length']]=[numpy.median(ic50_value),r['peptide']]
+	return ref_dict
 		
 def seqPred(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict):
 	prot_seq= '%0A'.join('%3Epredict'+str(i)+'%0A'+seq for i,seq in enumerate(prot_seq_list))
@@ -120,16 +130,6 @@ def seqPredLocal(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict, 
 	parsed_dict=[parsePred(open(tmp_file)) for tmp_file in file_list]
 	os.system('rm -f '+outdir+'/tmp*')
 	return parsed_dict
-
-def parsePred(stdout):
-	ref_dict={}
-	ref_out=csv.DictReader(stdout,delimiter='\t')
-	for r in ref_out:
-		ic50=[k for k in r.keys() if k.find('ic50')!=-1]
-		p = re.compile('\d+(\.\d+)?')
-		ic50_value=[float(r[k]) for k in ic50 if p.match(r[k]) != None]
-		ref_dict[r['allele']+'_'+r['seq_num']+'_'+r['start']+'_'+r['length']]=[numpy.median(ic50_value),r['peptide']]
-	return ref_dict
 
 def mergePeps2Database(fastafile, reference, outdir): 
 	##need to change
