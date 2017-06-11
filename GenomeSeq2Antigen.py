@@ -1,6 +1,10 @@
-import sys, argparse, subprocess, csv, re, numpy, datetime, os, uuid
+import sys, argparse, subprocess, csv, re, numpy, datetime, os, uuid, logging
 import multiprocessing as mp
 from Bio.Blast import NCBIXML
+
+now = datetime.datetime.now()
+ID = str(uuid.uuid4()).split('-')[0]
+
 
 def getTerminalSize():
 	env = os.environ
@@ -65,6 +69,7 @@ def getProtSeq(id, seq_list):
 			fout.write(p_seq[0]+'\n')
 		fout.close()
 		cmd1='blastp -query prot.tmp.fa -db ~/nobackup-yxing/references.annotations/Homo_sapiens.GRCh38.pep.all.fa -matrix PAM30 -out prot.tmp.blast.xml -outfmt 5'
+		logging.debug('[blastp] blast for '+';'.join([ps[0] for ps in prot_seq_left]))
 		print '[blastp] blast for '+';'.join([ps[0] for ps in prot_seq_left])
 		os.system(cmd1)
 		for blast_result in NCBIXML.parse(open('prot.tmp.blast.xml')): 
@@ -123,8 +128,7 @@ def translate_dna(seq, orf_option=3, rm_early_stop=True):
 					prot_seq += letter.lower()
 			else:
 				prot_seq += '*'
-				print current_triple.upper()
-				print 'unknown codon'
+				print 'unknown codon',current_triple.upper() 
 				break
 		if prot_seq.find('_')!=-1:
 			if rm_early_stop:
@@ -183,6 +187,7 @@ def seqPred(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict):
 
 def localIEDBCommand(iedb_path, hla_allele, epitope_len, outdir):
 	cmd = 'python '+iedb_path+'/predict_binding.py IEDB_recommended '+hla_allele+' '+epitope_len+' '+outdir+'/tmp.fasta > '+outdir+'/tmp_'+hla_allele.replace('*','_').replace(':','_')+'_'+epitope_len+'_iedb.txt'
+	logging.debug('[iedb] '+cmd)
 	os.system(cmd)
 
 def seqPredLocal(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict, iedb_path, outdir):
@@ -207,58 +212,92 @@ def seqPredLocal(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict, 
 	return parsed_dict
 
 
+def main():
+	#Define parameters
+	parser = argparse.ArgumentParser(description='NeoEpitome-Mut2Antigen (v1.0)')
+	parser.add_argument('fasta_input', help='input alternative splicing or fusion sequences in Fasta format.')
+	parser.add_argument('-e', '--epitope-len-list', default='9,10,11', help='epitope length for prediction. Default is 9,10,11.')
+	parser.add_argument('-a', '--hla-allele-list', default='HLA-A*01:01,HLA-B*08:01,HLA-C*07:01', help='a list of HLA types. Default is HLA-A*01:01,HLA-B*08:01,HLA-C*07:01.')
+	parser.add_argument('-o', '--outdir', default= 'Result.'+ID, help='The output directory.')
+	parser.add_argument('--iedb-local', default='~/nobackup-yxing/local/bin/mhc_i/src/', help='Specify local IEDB location if it is installed.')
+	parser.add_argument('--ic50-cut-off', default=500, help='Cut-off based on median value of concensus predicted IC50 values. Default is 1000.')
+	parser.add_argument('--protein-ms', type=argparse.FileType('r'), help='mzML format is recommended. Currently only support library search. Quantatitive pipeline is under development.')
+	parser.add_argument('--protein-reference', default= 'data/.fasta', help='fasta format reference protein sequences. Details see MSGFPlus manu.')
+	parser.add_argument('--protein-mod', default= 'data/mod.txt', help='protein modification file needed for labeled MS data library search. Details see MSGFPlus manu.')
+	args = parser.parse_args()
 
-# def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off, outdir, iedb_path, fs):
-	
-# 	if len(dna_pos)==step or file_index==fin_len-1:
-# 		if len(dna_pos)==0:
-# 			continue
-# 		if iedb_path:
-# 			pred_result_mut=seqPredLocal(mut_seq, hla_allele_list, epitope_len_list, mhc_type_dict, iedb_path, outdir)
-# 			pred_result_ref=seqPredLocal(ref_seq, hla_allele_list, epitope_len_list, mhc_type_dict, iedb_path, outdir)
-# 		else:
-# 			pred_result_mut=seqPred(mut_seq, hla_allele_list, epitope_len_list, mhc_type_dict)
-# 			pred_result_ref=seqPred(ref_seq, hla_allele_list, epitope_len_list, mhc_type_dict)
-# 		for i,pred_allele_result_mut in enumerate(pred_result_mut):
-# 			for k in pred_allele_result_mut:
-# 				foc=pred_allele_result_mut[k][0]/pred_result_ref[i][k][0]
-# 				ks=k.split('_')
-# 				seq_index=int(ks[1])-1
-# 				start_pos_seq=int(start_pos[seq_index])+int(ks[2])
-# 				allele=ks[0]
-# 				epitope_len=ks[3]
-# 				fout.write(('{}\t'*15+'{}\n').format(dna_pos[seq_index],dna_var[seq_index],gene_name[seq_index],gene_ac[seq_index],trnscrpt_ac[seq_index],prot_ac[seq_index],prot_pos[seq_index],prot_var[seq_index],start_pos_seq,epitope_len,allele,pred_result_ref[i][k][0],pred_allele_result_mut[k][0],foc,mut_seq[seq_index],pred_allele_result_mut[k][1]))
-# 				if pred_allele_result_mut[k][0]>int(ic50_cut_off):
-# 					continue
-# 				fout_seq.write('>{}\n{}\n'.format(dna_pos[seq_index]+'_'+dna_var[seq_index]+'_'+gene_name[seq_index]+'_'+prot_ac[seq_index]+'_'+str(prot_pos[seq_index])+'_'+str(start_pos_seq)+'_'+prot_var[seq_index]+'_'+str(epitope_len)+'_'+allele,prot_seq_mut[seq_index])) #FASTA with full length mutant protein sequences, let the library search algorithm to remove duplicated fragments.
-# 		dna_pos,dna_var,prot_ac,gene_name,gene_ac,trnscrpt_ac,prot_pos,prot_var,prot_seq_ref,prot_seq_mut,start_pos,mut_seq,ref_seq=([] for i in range(13))
 
-header=''
-out_prefix=sys.argv[2].strip('/')
-if os.path.exists(out_prefix)==False:
-	os.system('mkdir '+out_prefix)
-fout=open(out_prefix+'/filtered_peptide.'+sys.argv[1].split('/')[-1],'w')
-for row_num,l in enumerate(open(sys.argv[1])):
-	if row_num%2==0:
-		header=l.strip()
-	else:
-		
-		ls=l.strip()
-		print '# Query:',str(row_num/2+1), 'Info:',header
-		header=header.strip().split('_')
-		DNA_seq_left,DNA_seq_right=getDNASeq(int(header[5].split(':')[1]), ls) 
-		protseqs_plus=getProtSeq('_'.join(header)+'_translation:forward',(DNA_seq_left,DNA_seq_right))
+	fin=args.fasta_input
+	outdir=args.outdir.rstrip('/')
+	os.system('mkdir -p '+outdir)
+	iedb_path=args.iedb_local
+	if args.iedb_local!=False:
+		iedb_path=args.iedb_local.rstrip('/')
 
-		DNA_seq_left,DNA_seq_right=getDNASeq(len(ls)-int(header[6].split(':')[1])-1, rev_complement(ls)) 
-		protseqs_minus=getProtSeq('_'.join(header)+'_translation:reverse',(DNA_seq_left,DNA_seq_right))
-		print '[writting] Confirmed peptide sequence(s): ', len(protseqs_plus+protseqs_minus)
-		peptide_final = '\n'.join(protseqs_plus+protseqs_minus)
-		fout.write(peptide_final)
+	logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s %(message)s',
+                    filename=outdir+'/NeoEpitome-GenomeSeq2Antigen.log'+ str(datetime.datetime.now())+'.txt' ,
+                    filemode='w')
+	#Translation
+	header=''
+	if os.path.exists(outdir)==False:
+		os.system('mkdir '+outdir)
+	prot_fout=open(outdir+'/filtered_peptide.'+fin.split('/')[-1],'w')
+	for row_num,l in enumerate(open(fin)):
+		if row_num%2==0:
+			header=l.strip()
+		else:
+			ls=l.strip()
+			logging.debug('[# Query: '+str(row_num/2+1) +' Info: '+header)
+			print '# Query:',str(row_num/2+1), 'Info:',header
+			header=header.strip().split('_')
+			DNA_seq_left,DNA_seq_right=getDNASeq(int(header[5].split(':')[1]), ls) 
+			protseqs_plus=getProtSeq('_'.join(header)+'_translation:forward',(DNA_seq_left,DNA_seq_right))
 
-fout.close()		
-# Prediction
-for r in open(out_prefix+'/filtered_peptide.'+sys.argv[1].split('/')[-1]):
+			DNA_seq_left,DNA_seq_right=getDNASeq(len(ls)-int(header[6].split(':')[1])-1, rev_complement(ls)) 
+			protseqs_minus=getProtSeq('_'.join(header)+'_translation:reverse',(DNA_seq_left,DNA_seq_right))
 
-			#print header,protseqs
+			logging.debug('[writting] Confirmed peptide sequence(s): '+str(len(protseqs_plus+protseqs_minus)))
+			print '[writting] Confirmed peptide sequence(s): ', len(protseqs_plus+protseqs_minus)
+			peptide_final=protseqs_plus+protseqs_minus
+			for entry in peptide_final:
+				prot_fout.write(entry+'\n')
+	prot_fout.close()
 
+	# Prediction
+	prot_seq_list=[]
+	prot_seq_header_list=[]
+	mhc_type_dict = loadMHCType()
+
+	pred_fout=open(outdir+'/pred.filtered_peptide.'+fin.split('/')[-1]+'.txt','w')
+	pred_fout_seq=open(outdir+'/pred.filtered_peptide.'+fin.split('/')[-1]+'.fasta','w')
+	for n,r in enumerate(open(outdir+'/filtered_peptide.'+fin.split('/')[-1])):
+		if n%2==0:
+			header=r.strip()
+		else:
+			rs=r.strip()
+			hs=header.split('_')
+			testable_pep=rs[max(0,int(hs[-1].split(':')[1])-11):min(int(hs[-1].split(':')[1])+11,len(rs))]
+			prot_seq_list.append(testable_pep)
+			prot_seq_header_list.append(header)
+	if prot_seq_list==[''] or prot_seq_list==[]:
+		logging.debug('No valid peptide.') 
+		sys.exit('No valid peptide.')
+
+	pred_result_mut = seqPredLocal(prot_seq_list,args.hla_allele_list.split(','),args.epitope_len_list.split(','), mhc_type_dict, iedb_path, outdir)
+	for i,pred_allele_result_mut in enumerate(pred_result_mut):
+		for k in pred_allele_result_mut:
+			ks=k.split('_')
+			seq_index=int(ks[1])-1
+			allele=ks[0]
+			epitope_len=ks[3]
+			fusion_pep = prot_seq_list[seq_index]
+			fusion_info = prot_seq_header_list[seq_index].split('_')
+			pred_fout.write(('{}\t'*8+'{}\n').format('_'.join(fusion_info[0:3]), fusion_info[-2],fusion_info[-1], int(ks[2]) - int(fusion_info[-1].split(':')[1]),epitope_len, allele, fusion_pep, pred_allele_result_mut[k][0],pred_allele_result_mut[k][1]))
+			if pred_allele_result_mut[k][0]>int(args.ic50_cut_off):
+				continue
+			pred_fout_seq.write('>{}\n{}\n'.format(prot_seq_header_list[seq_index]+'_'+epitope_len+'_'+allele+'_'+ks[2],fusion_pep))#FASTA with full length mutant protein sequences, let the library search algorithm to remove duplicated fragments.
+
+if __name__ == '__main__':
+	main()
 
