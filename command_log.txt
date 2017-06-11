@@ -33,3 +33,10 @@ STAR 35G multithreading, cufflinks 1G,
 
 6. Note
 
+
+
+
+
+
+#####
+python AS2Antigen.py ~/nobackup-yxing/rMATS-turbo/TCGA-A7-A0D9.Case-Ctrl/SE.MATS.JC.COV.FDR10.txt ~/nobackup-yxing/references.annotations/37.chr/ucsc.hg19.fasta ~/nobackup-yxing/references.annotations/Homo_sapiens.GRCh38.pep.all.fa
