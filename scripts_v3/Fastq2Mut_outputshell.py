@@ -66,19 +66,21 @@ def create_intervals(outPath, sampleID, reference):
 	fout.close()
 	return m
 
-def SNP_calling_MuSE_command(outPath, sampleID, reference, known_snps, n):
+def SNP_calling_MuSE_command(outPath, sampleID, reference, known_snps, n, bamIn):
 	cmd9='MuSE call -f '+reference+' '+outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam -l '+outPath+sampleID+'/'+sampleID+'.intervals.'+str(n)+'.bed '+outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam '+'-O '+outPath+sampleID+'/'+sampleID+'.intermediate.'+str(n)
+	if bamIn:
+		cmd9='MuSE call -f '+reference+' '+bamIn[0]+' -l '+outPath+sampleID+'/'+sampleID+'.intervals.'+str(n)+'.bed '+bamIn[1]+' '+'-O '+outPath+sampleID+'/'+sampleID+'.intermediate.'+str(n)
 	logging.debug('[DNA-seq] Running command 9: '+cmd9+'\n')
 	os.system(cmd9)
 
-def SNP_calling_MuSE(outPath, sampleID, reference, known_snps, numInterval):
+def SNP_calling_MuSE(outPath, sampleID, reference, known_snps, numInterval, bamIn):
 	logging.debug('[DNA-seq] # Start MuSE.')
 	print '[DNA-seq] # Start MuSE.'
 
 	if os.path.exists(outPath+sampleID+'/'+sampleID+'.muse.snp.vcf')==False:
 		muse_calling=[]
 		for n in xrange(1,numInterval+1):
-			muse_calling.append(mp.Process(target=SNP_calling_MuSE_command,args=(outPath, sampleID, reference, known_snps, n)))
+			muse_calling.append(mp.Process(target=SNP_calling_MuSE_command,args=(outPath, sampleID, reference, known_snps, n, bamIn)))
 			muse_calling[n-1].start()
 		for n in xrange(1,numInterval+1):
 			muse_calling[n-1].join()
@@ -94,13 +96,16 @@ def SNP_calling_MuSE(outPath, sampleID, reference, known_snps, numInterval):
 	logging.debug('[DNA-seq] # MuSE SNV calling completed.')
 	print '[DNA-seq] # MuSE SNV calling completed.'
 
-def SNP_calling_MuTect_command(outPath, sampleID, reference, known_snps, jarPath, n):
+def SNP_calling_MuTect_command(outPath, sampleID, reference, known_snps, jarPath, n, bamIn):
 
 	cmd9=JAVA7+' -jar '+jarPath+'/mutect.jar --analysis_type MuTect --intervals '+outPath+sampleID+'/'+sampleID+'.intervals.'+str(n)+'.bed --reference_sequence '+reference+' --dbsnp '+known_snps+' --input_file:normal '+outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam --input_file:tumor '+outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam --out '+outPath+sampleID+'/'+sampleID+'.'+str(n)+'.mutect.snp.txt'
+	if bamIn:
+		cmd9=JAVA7+' -jar '+jarPath+'/mutect.jar --analysis_type MuTect --intervals '+outPath+sampleID+'/'+sampleID+'.intervals.'+str(n)+'.bed --reference_sequence '+reference+' --dbsnp '+known_snps+' --input_file:normal '+bamIn[1]+' --input_file:tumor '+bamIn[0]+' --out '+outPath+sampleID+'/'+sampleID+'.'+str(n)+'.mutect.snp.txt'
+
 	logging.debug('[DNA-seq] Running command 9: '+cmd9+'\n')
 	os.system(cmd9)
 
-def SNP_calling_MuTect(outPath, sampleID, reference, known_snps, jarPath, numInterval):
+def SNP_calling_MuTect(outPath, sampleID, reference, known_snps, jarPath, numInterval, bamIn):
 	logging.debug('[DNA-seq] # Start MuTect.')
 	print '[DNA-seq] # Start MuTect.'
 
@@ -108,7 +113,7 @@ def SNP_calling_MuTect(outPath, sampleID, reference, known_snps, jarPath, numInt
 
 		mutect_calling=[]
 		for n in xrange(1,numInterval+1):
-			mutect_calling.append(mp.Process(target=SNP_calling_MuTect_command,args=(outPath, sampleID, reference, known_snps, jarPath, n)))
+			mutect_calling.append(mp.Process(target=SNP_calling_MuTect_command,args=(outPath, sampleID, reference, known_snps, jarPath, n, bamIn)))
 			mutect_calling[n-1].start()
 		for n in xrange(1,numInterval+1):
 			mutect_calling[n-1].join()
@@ -120,12 +125,14 @@ def SNP_calling_MuTect(outPath, sampleID, reference, known_snps, jarPath, numInt
 	logging.debug('[DNA-seq] # MuTect SNV calling completed.')
 	print '[DNA-seq] # MuTect SNV calling completed.'
 	
-def SNP_calling_VarScan2(outPath, sampleID, reference, jarPath):
+def SNP_calling_VarScan2(outPath, sampleID, reference, jarPath, bamIn):
 	logging.debug('[DNA-seq] # Start VarScan2.')
 	print '[DNA-seq] # Start VarScan2.'
 	if os.path.exists(outPath+sampleID+'/'+sampleID+'.varscan.snp.vcf')==False:
-
+		
 		cmd9='samtools mpileup -f '+reference+' -q 1 -B '+outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam '+outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam > '+outPath+sampleID+'/intermediate.pileup'
+		if bamIn:
+			cmd9='samtools mpileup -f '+reference+' -q 1 -B '+bamIn[1]+' '+bamIn[0]+' > '+outPath+sampleID+'/intermediate.pileup'
 		logging.debug('[DNA-seq] Running command 9: '+cmd9+'\n')
 		os.system(cmd9)
 
@@ -185,10 +192,11 @@ parser.add_argument('-r','--reference',help='Reference genome used for short rea
 parser.add_argument('-i','--known-indels',help='known indel for GATK use. Sorted VCF format. Detail see GATK.')
 parser.add_argument('-s','--known-snps',help='dbSNP for GATK use. Sorted VCF format. Detail see GATK.')
 parser.add_argument('readsFilesCase',help='Tumor sample paired-end fastq files seperated by ",". ')
-parser.add_argument('readsFilesCtrl', help='Numor sample paired-end fastq files seperated by ",".')
+parser.add_argument('readsFilesCtrl', help='Normal sample paired-end fastq files seperated by ",".')
 parser.add_argument('-d','--binDir', help='Directory for java applications indluding GATK, picard.')
 parser.add_argument('-p','--sampleID', default='NeoEpitomeOut', help='Sample ID will be used for output folder name and reads group name.')
 parser.add_argument('--snv-calling-method',default='VarScan2', help='SNV calling method can be set as VarScan2, MuTect, MuSE, or consensus of the three. Default is VarScan2.')
+parser.add_argument('--bam',default=False,help='If inputs are BAM files, ')
 args = parser.parse_args()
 if args.snv_calling_method=='MuSE' or args.snv_calling_method=='consensus':
 	if args.known_snps.endswith('vcf.gz')!=True:
@@ -205,100 +213,108 @@ logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(message)s',
                     filename=outPath+sampleID+'/NeoEpitome-Fastq2Mut.log'+ str(datetime.datetime.now())+'.txt' ,
                     filemode='w')
-#Step 1
-logging.debug('[DNA-seq] # Start DNA mapping.')
-print '[DNA-seq] # Start DNA mapping.'
-if os.path.exists(outPath+sampleID+'.case/case.mkdup.merged.sorted.output.bam')==False or os.path.exists(outPath+sampleID+'.ctrl/ctrl.mkdup.merged.sorted.output.bam')==False:
-	
-	mappings=[]
-	mappings.append(mp.Process(target=DNA_mapping,args=(args.readsFilesCase,jarPath,outPath+sampleID+'.case/case',sampleID, args.reference)))
-	mappings[0].start()
-	mappings.append(mp.Process(target=DNA_mapping,args=(args.readsFilesCtrl,jarPath,outPath+sampleID+'.ctrl/ctrl',sampleID, args.reference)))
-	mappings[1].start()
-	mappings[0].join()
-	mappings[1].join()
+if args.bam==False:
 
+	#Step 1
+	logging.debug('[DNA-seq] # Start DNA mapping.')
+	print '[DNA-seq] # Start DNA mapping.'
 	if os.path.exists(outPath+sampleID+'.case/case.mkdup.merged.sorted.output.bam')==False or os.path.exists(outPath+sampleID+'.ctrl/ctrl.mkdup.merged.sorted.output.bam')==False:
-		sys.exit('[DNA-seq] # An Error Occured. DNA mapping Incomplete. Exit!')
-	# os.system('rm '+outPath+sampleID+'.case/case.merged.sorted.output.bam')
-	# os.system('rm '+outPath+sampleID+'.case/case.sorted.output.bam')
-	# os.system('rm '+outPath+sampleID+'.ctrl/ctrl.merged.sorted.output.bam')
-	# os.system('rm '+outPath+sampleID+'.ctrl/ctrl.sorted.output.bam')
+		
+		mappings=[]
+		mappings.append(mp.Process(target=DNA_mapping,args=(args.readsFilesCase,jarPath,outPath+sampleID+'.case/case',sampleID, args.reference)))
+		mappings[0].start()
+		mappings.append(mp.Process(target=DNA_mapping,args=(args.readsFilesCtrl,jarPath,outPath+sampleID+'.ctrl/ctrl',sampleID, args.reference)))
+		mappings[1].start()
+		mappings[0].join()
+		mappings[1].join()
 
-else:
-	logging.debug('[DNA-seq] # Skipped DNA mapping.')
-	print '[DNA-seq] # Skipped DNA mapping.'
+		if os.path.exists(outPath+sampleID+'.case/case.mkdup.merged.sorted.output.bam')==False or os.path.exists(outPath+sampleID+'.ctrl/ctrl.mkdup.merged.sorted.output.bam')==False:
+			sys.exit('[DNA-seq] # An Error Occured. DNA mapping Incomplete. Exit!')
+		# os.system('rm '+outPath+sampleID+'.case/case.merged.sorted.output.bam')
+		# os.system('rm '+outPath+sampleID+'.case/case.sorted.output.bam')
+		# os.system('rm '+outPath+sampleID+'.ctrl/ctrl.merged.sorted.output.bam')
+		# os.system('rm '+outPath+sampleID+'.ctrl/ctrl.sorted.output.bam')
+
+	else:
+		logging.debug('[DNA-seq] # Skipped DNA mapping.')
+		print '[DNA-seq] # Skipped DNA mapping.'
 
 
-#Step 2
-logging.debug('[DNA-seq] # GATK bam refining - Indel.')
-print '[DNA-seq] # GATK bam refining - Indel.'
-os.system('mkdir -p '+outPath+sampleID)
-if os.path.exists(outPath+sampleID+'.case/case.idrealn.mkdup.merged.sorted.output.bam')==False or os.path.exists(outPath+sampleID+'.ctrl/ctrl.idrealn.mkdup.merged.sorted.output.bam')==False:
-
-	cmd5=JAVA8+' -jar '+jarPath+'/GenomeAnalysisTK.jar -T RealignerTargetCreator -nt 8 -R '+args.reference+' -known '+args.known_indels+' -I '+outPath+sampleID+'.case/case.mkdup.merged.sorted.output.bam -I '+outPath+sampleID+'.ctrl/ctrl.mkdup.merged.sorted.output.bam -o '+outPath+sampleID+'/realign_target.intervals'
-	logging.debug('[DNA-seq] Running command 5: '+cmd5+'\n')
-	os.system(cmd5)
-
-	os.system('rm -f '+outPath+sampleID+'/output.map')
-	guide_file=open(outPath+sampleID+'/output.map','w')
-	guide_file.write('case.mkdup.merged.sorted.output.bam\t'+outPath+sampleID+'.case/case.idrealn.mkdup.merged.sorted.output.bam\nctrl.mkdup.merged.sorted.output.bam\t'+outPath+sampleID+'.ctrl/ctrl.idrealn.mkdup.merged.sorted.output.bam')
-	guide_file.close()
-
-	cmd6=JAVA8+' -jar '+jarPath+'/GenomeAnalysisTK.jar -T IndelRealigner -R '+args.reference+' -known '+args.known_indels+' -targetIntervals '+outPath+sampleID+'/realign_target.intervals --noOriginalAlignmentTags -I '+outPath+sampleID+'.case/case.mkdup.merged.sorted.output.bam -I '+outPath+sampleID+'.ctrl/ctrl.mkdup.merged.sorted.output.bam -nWayOut '+outPath+sampleID+'/output.map'
-	logging.debug('[DNA-seq] Running command 6: '+cmd6+'\n')
-	os.system(cmd6)
-
-	os.system('mv '+outPath+sampleID+'/output.map '+outPath+sampleID+'/output.map_USED')
-
+	#Step 2
+	logging.debug('[DNA-seq] # GATK bam refining - Indel.')
+	print '[DNA-seq] # GATK bam refining - Indel.'
+	os.system('mkdir -p '+outPath+sampleID)
 	if os.path.exists(outPath+sampleID+'.case/case.idrealn.mkdup.merged.sorted.output.bam')==False or os.path.exists(outPath+sampleID+'.ctrl/ctrl.idrealn.mkdup.merged.sorted.output.bam')==False:
-		sys.exit('[DNA-seq] # An Error Occured. GATK bam refining - Indel Incomplete. Exit!')
-	#os.system('rm '+outPath+sampleID+'.case/case.mkdup.merged.sorted.output.bam')
-	#os.system('rm '+outPath+sampleID+'.ctrl/ctrl.mkdup.merged.sorted.output.bam')
-else:
-	logging.debug('[DNA-seq] # Skipped GATK bam refining - Indel.')
-	print '[DNA-seq] # Skipped GATK bam refining - Indel.'
 
-#Step 3
-logging.debug('[DNA-seq] # GATK bam refining - SNP.')
-print '[DNA-seq] # GATK bam refining - SNP.'
+		cmd5=JAVA8+' -jar '+jarPath+'/GenomeAnalysisTK.jar -T RealignerTargetCreator -nt 8 -R '+args.reference+' -known '+args.known_indels+' -I '+outPath+sampleID+'.case/case.mkdup.merged.sorted.output.bam -I '+outPath+sampleID+'.ctrl/ctrl.mkdup.merged.sorted.output.bam -o '+outPath+sampleID+'/realign_target.intervals'
+		logging.debug('[DNA-seq] Running command 5: '+cmd5+'\n')
+		os.system(cmd5)
 
-if os.path.exists(outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam')==False or os.path.exists(outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam')==False:
-	
-	recalibratings=[]
-	recalibratings.append(mp.Process(target=BRSQ,args=(args.reference,jarPath,outPath+sampleID+'.case/case',args.known_snps)))
-	recalibratings[0].start()
-	recalibratings.append(mp.Process(target=BRSQ,args=(args.reference,jarPath,outPath+sampleID+'.ctrl/ctrl',args.known_snps)))
-	recalibratings[1].start()
-	recalibratings[0].join()
-	recalibratings[1].join()
+		os.system('rm -f '+outPath+sampleID+'/output.map')
+		guide_file=open(outPath+sampleID+'/output.map','w')
+		guide_file.write('case.mkdup.merged.sorted.output.bam\t'+outPath+sampleID+'.case/case.idrealn.mkdup.merged.sorted.output.bam\nctrl.mkdup.merged.sorted.output.bam\t'+outPath+sampleID+'.ctrl/ctrl.idrealn.mkdup.merged.sorted.output.bam')
+		guide_file.close()
+
+		cmd6=JAVA8+' -jar '+jarPath+'/GenomeAnalysisTK.jar -T IndelRealigner -R '+args.reference+' -known '+args.known_indels+' -targetIntervals '+outPath+sampleID+'/realign_target.intervals --noOriginalAlignmentTags -I '+outPath+sampleID+'.case/case.mkdup.merged.sorted.output.bam -I '+outPath+sampleID+'.ctrl/ctrl.mkdup.merged.sorted.output.bam -nWayOut '+outPath+sampleID+'/output.map'
+		logging.debug('[DNA-seq] Running command 6: '+cmd6+'\n')
+		os.system(cmd6)
+
+		os.system('mv '+outPath+sampleID+'/output.map '+outPath+sampleID+'/output.map_USED')
+
+		if os.path.exists(outPath+sampleID+'.case/case.idrealn.mkdup.merged.sorted.output.bam')==False or os.path.exists(outPath+sampleID+'.ctrl/ctrl.idrealn.mkdup.merged.sorted.output.bam')==False:
+			sys.exit('[DNA-seq] # An Error Occured. GATK bam refining - Indel Incomplete. Exit!')
+		#os.system('rm '+outPath+sampleID+'.case/case.mkdup.merged.sorted.output.bam')
+		#os.system('rm '+outPath+sampleID+'.ctrl/ctrl.mkdup.merged.sorted.output.bam')
+	else:
+		logging.debug('[DNA-seq] # Skipped GATK bam refining - Indel.')
+		print '[DNA-seq] # Skipped GATK bam refining - Indel.'
+
+	#Step 3
+	logging.debug('[DNA-seq] # GATK bam refining - SNP.')
+	print '[DNA-seq] # GATK bam refining - SNP.'
 
 	if os.path.exists(outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam')==False or os.path.exists(outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam')==False:
-		sys.exit('[DNA-seq] # An Error Occured. GATK bam refining - SNP Incomplete. Exit!')
-	#os.system('rm '+outPath+sampleID+'.case/case.idrealn.mkdup.merged.sorted.output.bam')
-	#os.system('rm '+outPath+sampleID+'.ctrl/ctrl.idrealn.mkdup.merged.sorted.output.bam')
+		
+		recalibratings=[]
+		recalibratings.append(mp.Process(target=BRSQ,args=(args.reference,jarPath,outPath+sampleID+'.case/case',args.known_snps)))
+		recalibratings[0].start()
+		recalibratings.append(mp.Process(target=BRSQ,args=(args.reference,jarPath,outPath+sampleID+'.ctrl/ctrl',args.known_snps)))
+		recalibratings[1].start()
+		recalibratings[0].join()
+		recalibratings[1].join()
 
-else:
-	logging.debug('[DNA-seq] # Skipped GATK bam refining - SNP.')
-	print '[DNA-seq] # Skipped GATK bam refining - SNP.'
+		if os.path.exists(outPath+sampleID+'.case/case.brsq.idrealn.mkdup.merged.sorted.output.bam')==False or os.path.exists(outPath+sampleID+'.ctrl/ctrl.brsq.idrealn.mkdup.merged.sorted.output.bam')==False:
+			sys.exit('[DNA-seq] # An Error Occured. GATK bam refining - SNP Incomplete. Exit!')
+		#os.system('rm '+outPath+sampleID+'.case/case.idrealn.mkdup.merged.sorted.output.bam')
+		#os.system('rm '+outPath+sampleID+'.ctrl/ctrl.idrealn.mkdup.merged.sorted.output.bam')
+
+	else:
+		logging.debug('[DNA-seq] # Skipped GATK bam refining - SNP.')
+		print '[DNA-seq] # Skipped GATK bam refining - SNP.'
+
 
 #Step 4
+#handle bam name
+bamIn=False
+if args.bam:
+	bamIn=args.bam.split(',')
+
 if args.snv_calling_method=='VarScan2':
-	SNP_calling_VarScan2(outPath, sampleID, args.reference, jarPath)
+	SNP_calling_VarScan2(outPath, sampleID, args.reference, jarPath, bamIn)
 elif args.snv_calling_method=='MuTect':
 	numInterval=create_intervals(outPath, sampleID, args.reference)
-	SNP_calling_MuTect(outPath, sampleID, args.reference, args.known_snps, jarPath, numInterval)
+	SNP_calling_MuTect(outPath, sampleID, args.reference, args.known_snps, jarPath, numInterval, bamIn)
 elif args.snv_calling_method=='MuSE':
 	numInterval=create_intervals(outPath, sampleID, args.reference)
-	SNP_calling_MuSE(outPath, sampleID, args.reference, args.known_snps, numInterval)
+	SNP_calling_MuSE(outPath, sampleID, args.reference, args.known_snps, numInterval, bamIn)
 elif args.snv_calling_method=='consensus':
 	numInterval=create_intervals(outPath, sampleID, args.reference)
 	callings=[]
-	callings.append(mp.Process(target=SNP_calling_VarScan2,args=(outPath, sampleID, args.reference, jarPath)))
+	callings.append(mp.Process(target=SNP_calling_VarScan2,args=(outPath, sampleID, args.reference, jarPath, bamIn)))
 	callings[0].start()
-	callings.append(mp.Process(target=SNP_calling_MuSE,args=(outPath, sampleID, args.reference, args.known_snps, numInterval)))
+	callings.append(mp.Process(target=SNP_calling_MuSE,args=(outPath, sampleID, args.reference, args.known_snps, numInterval, bamIn)))
 	callings[1].start()
-	callings.append(mp.Process(target=SNP_calling_MuTect,args=(outPath, sampleID, args.reference, args.known_snps, jarPath, numInterval)))
+	callings.append(mp.Process(target=SNP_calling_MuTect,args=(outPath, sampleID, args.reference, args.known_snps, jarPath, numInterval, bamIn)))
 	callings[2].start()
 	callings[0].join()
 	callings[1].join()
