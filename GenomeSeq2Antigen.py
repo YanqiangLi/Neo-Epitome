@@ -55,7 +55,23 @@ def fileLen(fin):
 			pass
 	return i
 
+def loadSampleMHC(f_s_in):
+	if f_s_in.find(',')!=-1:
+		hla_allele_list=f_s_in.split(',')
+	else:
+		n=0
+		hla_allele_list=[]
+		for l in open(f_s_in):
+			if n==0:
+				n+=1
+				continue
+			ls=l.strip().split('\t')
+			hla_allele_list.append('HLA-'+ls[1].strip("'"))
+			hla_allele_list.append('HLA-'+ls[3].strip("'"))
+	return hla_allele_list
+
 def getProtSeq(id, seq_list):
+	print id
 	seq_left,seq_right=seq_list
 	prot_seq_left = translate_dna(seq_left)
 	prot_seq_left_blast = {}
@@ -78,6 +94,8 @@ def getProtSeq(id, seq_list):
 				hit_name_pos = hit_name[3].split(':')
 				if hit_name_pos[2] == query_name[0].strip('chr'):
 					if abs(int(query_name[1])-int(hit_name_pos[3]))<=10000000:
+						print query_name
+						print hit_name
 						query_info=str(blast_result.query).split('_')
 						prot_seq_left_blast[query_info[0]]=query_info[1]
 						break
@@ -87,6 +105,19 @@ def getProtSeq(id, seq_list):
 				prot_full_junc=translate_dna(seq_left[orf:]+seq_right,1, False)
 				header_line=id+'_orf:'+str(orf)+'_junction:'+prot_seq_left_blast[str(orf)]+'\n'
 				prot_seqs.append(header_line+prot_full_junc[0][0])
+	return prot_seqs
+
+def getProtSeq_fast(id, seq_list):
+	seq_left,seq_right=seq_list
+	prot_seq_left = translate_dna(seq_left)
+	if len(prot_seq_left)==0:
+		return []
+	else:
+		prot_seqs=[]
+		for seq,orf in prot_seq_left:
+			prot_full_junc=translate_dna(seq_left[orf:]+seq_right,1, False)
+			header_line=id+'_orf:'+str(orf)+'_junction:'+str(len(prot_seq_left[0][0]))+'\n'
+			prot_seqs.append(header_line+prot_full_junc[0][0])
 	return prot_seqs
 
 def translate_dna(seq, orf_option=3, rm_early_stop=True):
@@ -115,6 +146,7 @@ def translate_dna(seq, orf_option=3, rm_early_stop=True):
 		prot_seq = ''
 		for n in range(0, len(cds), 3):
 			current_triple = cds[n:n+3]
+
 			if len(current_triple)!=3:
 				break
 			if current_triple.upper() in codontable:
@@ -214,7 +246,7 @@ def seqPredLocal(prot_seq_list,hla_allele_list,epitope_len_list, mhc_type_dict, 
 
 def main():
 	#Define parameters
-	parser = argparse.ArgumentParser(description='NeoEpitome-Mut2Antigen (v1.0)')
+	parser = argparse.ArgumentParser(description='NeoEpitome-Seq2Antigen (v1.0)')
 	parser.add_argument('fasta_input', help='input alternative splicing or fusion sequences in Fasta format.')
 	parser.add_argument('-e', '--epitope-len-list', default='9,10,11', help='epitope length for prediction. Default is 9,10,11.')
 	parser.add_argument('-a', '--hla-allele-list', default='HLA-A*01:01,HLA-B*08:01,HLA-C*07:01', help='a list of HLA types. Default is HLA-A*01:01,HLA-B*08:01,HLA-C*07:01.')
@@ -233,6 +265,9 @@ def main():
 	iedb_path=args.iedb_local
 	if args.iedb_local!=False:
 		iedb_path=args.iedb_local.rstrip('/')
+	hla_allele_list=loadSampleMHC(args.hla_allele_list)
+	if hla_allele_list==[]:
+		sys.exit("# No HLA Alleles. Exit.")
 
 	logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(message)s',
@@ -252,10 +287,10 @@ def main():
 			print '# Query:',str(row_num/2+1), 'Info:',header
 			header=header.strip().split('_')
 			DNA_seq_left,DNA_seq_right=getDNASeq(int(header[5].split(':')[1]), ls) 
-			protseqs_plus=getProtSeq('_'.join(header)+'_translation:forward',(DNA_seq_left,DNA_seq_right))
+			protseqs_plus=getProtSeq_fast('_'.join(header)+'_translation:forward',(DNA_seq_left,DNA_seq_right))
 
 			DNA_seq_left,DNA_seq_right=getDNASeq(len(ls)-int(header[6].split(':')[1])-1, rev_complement(ls)) 
-			protseqs_minus=getProtSeq('_'.join(header)+'_translation:reverse',(DNA_seq_left,DNA_seq_right))
+			protseqs_minus=getProtSeq_fast('_'.join(header)+'_translation:reverse',(DNA_seq_left,DNA_seq_right))
 
 			logging.debug('[writting] Confirmed peptide sequence(s): '+str(len(protseqs_plus+protseqs_minus)))
 			print '[writting] Confirmed peptide sequence(s): ', len(protseqs_plus+protseqs_minus)
@@ -284,7 +319,7 @@ def main():
 		logging.debug('No valid peptide.') 
 		sys.exit('No valid peptide.')
 
-	pred_result_mut = seqPredLocal(prot_seq_list,args.hla_allele_list.split(','),args.epitope_len_list.split(','), mhc_type_dict, iedb_path, outdir)
+	pred_result_mut = seqPredLocal(prot_seq_list,hla_allele_list,args.epitope_len_list.split(','), mhc_type_dict, iedb_path, outdir)
 	for i,pred_allele_result_mut in enumerate(pred_result_mut):
 		for k in pred_allele_result_mut:
 			ks=k.split('_')
@@ -293,7 +328,7 @@ def main():
 			epitope_len=ks[3]
 			fusion_pep = prot_seq_list[seq_index]
 			fusion_info = prot_seq_header_list[seq_index].split('_')
-			pred_fout.write(('{}\t'*8+'{}\n').format('_'.join(fusion_info[0:3]), fusion_info[-2],fusion_info[-1], int(ks[2]) - int(fusion_info[-1].split(':')[1]),epitope_len, allele, fusion_pep, pred_allele_result_mut[k][0],pred_allele_result_mut[k][1]))
+			pred_fout.write(('{}\t'*9+'{}\n').format('_'.join(fusion_info[0:3]),fusion_info[-3], fusion_info[-2],fusion_info[-1], int(ks[2]) - int(fusion_info[-1].split(':')[1]),epitope_len, allele, fusion_pep, pred_allele_result_mut[k][0],pred_allele_result_mut[k][1]))
 			if pred_allele_result_mut[k][0]>int(args.ic50_cut_off):
 				continue
 			pred_fout_seq.write('>{}\n{}\n'.format(prot_seq_header_list[seq_index]+'_'+epitope_len+'_'+allele+'_'+ks[2],fusion_pep))#FASTA with full length mutant protein sequences, let the library search algorithm to remove duplicated fragments.
