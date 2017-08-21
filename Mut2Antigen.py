@@ -63,6 +63,21 @@ def fileLen(fin):
 			pass
 	return i
 
+def loadSampleMHC(f_s_in):
+	if f_s_in.find(',')!=-1:
+		hla_allele_list=f_s_in.split(',')
+	else:
+		n=0
+		hla_allele_list=[]
+		for l in open(f_s_in):
+			if n==0:
+				n+=1
+				continue
+			ls=l.strip().split('\t')
+			hla_allele_list.append('HLA-'+ls[1].strip("'"))
+			hla_allele_list.append('HLA-'+ls[3].strip("'"))
+	return hla_allele_list
+
 def vcfAnnotation(vcf_input, outdir, assembly):
 	cmd1=VEP_PATH+'/vep --species homo_sapiens --assembly '+assembly+' --offline --dir_cache '+CACHE_PATH+' --dir_plugins '+PLUGIN_PATH+' --input_file '+vcf_input+' --vcf --symbol --terms SO --plugin Downstream --plugin Wildtype --uniprot --canonical -hgvs --output_file '+outdir+'/'+vcf_input.split('/')[-1].split('.vcf')[0]+'.vep.vcf'
 	os.system(cmd1)
@@ -248,12 +263,16 @@ def mutationPipeline(fin, hla_allele_list, epitope_len_list, step, ic50_cut_off,
 						ks=k.split('_')
 						seq_index=int(ks[1])-1
 						start_pos_seq=int(start_pos[seq_index])+int(ks[2])
+						#filtering predictions beyond the epitope length
 						allele=ks[0]
 						epitope_len=ks[3]
+						
+						if start_pos_seq <=(prot_pos[seq_index]-epitope_len) or start_pos_seq>prot_pos[seq_index]:
+							continu
 						fout.write(('{}\t'*15+'{}\n').format(dna_pos[seq_index],dna_var[seq_index],gene_name[seq_index],gene_ac[seq_index],trnscrpt_ac[seq_index],prot_ac[seq_index],prot_pos[seq_index],prot_var[seq_index],start_pos_seq,epitope_len,allele,pred_result_ref[i][k][0],pred_allele_result_mut[k][0],foc,mut_seq[seq_index],pred_allele_result_mut[k][1]))
 						if pred_allele_result_mut[k][0]>int(ic50_cut_off):
 							continue
-						fout_seq.write('>{}\n{}\n'.format(dna_pos[seq_index]+'_'+dna_var[seq_index]+'_'+gene_name[seq_index]+'_'+prot_ac[seq_index]+'_'+str(prot_pos[seq_index])+'_'+str(start_pos_seq)+'_'+prot_var[seq_index]+'_'+str(epitope_len)+'_'+allele,prot_seq_mut[seq_index])) #FASTA with full length mutant protein sequences, let the library search algorithm to remove duplicated fragments.
+						fout_seq.write('>{}\n{}\n'.format(dna_pos[seq_index]+'_'+dna_var[seq_index]+'_'+gene_name[seq_index]+'_'+prot_ac[seq_index]+'_'+str(prot_pos[seq_index])+'_'+str(start_pos_seq)+'_'+prot_var[seq_index]+'_'+str(epitope_len)+'_'+allele+'_'+pred_allele_result_mut[k][1],prot_seq_mut[seq_index])) #FASTA with full length mutant protein sequences, let the library search algorithm to remove duplicated fragments.
 				dna_pos,dna_var,prot_ac,gene_name,gene_ac,trnscrpt_ac,prot_pos,prot_var,prot_seq_ref,prot_seq_mut,start_pos,mut_seq,ref_seq=([] for i in range(13))
 
 def appendExpandCov(args):
@@ -341,7 +360,7 @@ def main():
 	parser = argparse.ArgumentParser(description='NeoEpitome-Mut2Antigen (v1.0)')
 	parser.add_argument('vcf_input', help='input annotated somatic mutation VCF file.')
 	parser.add_argument('-j', '--junction-input', help='input of somatic junctions file.')
-	parser.add_argument('-e', '--epitope-len-list', default='9,10', help='epitope length for prediction. Default is 9,10.')
+	parser.add_argument('-e', '--epitope-len-list', default='9,10,11', help='epitope length for prediction. Default is 9,10.')
 	parser.add_argument('-a', '--hla-allele-list', default='HLA-A*01:01,HLA-B*07:02', help='a list of HLA types. Default is HLA-A*01:01,HLA-B*01:01.')
 	parser.add_argument('-o', '--outdir', default= 'Result.'+ID, help='The output directory.')
 	parser.add_argument('--vcf-annotation', action='store_true', help='Specify local IEDB location if it is installed.')
@@ -375,8 +394,9 @@ def main():
 	iedb_path=args.iedb_local
 	if args.iedb_local!=False:
 		iedb_path=args.iedb_local.rstrip('/')
-	hla_allele_list=args.hla_allele_list.split(',')
-
+	hla_allele_list=loadSampleMHC(args.hla_allele_list)
+	if hla_allele_list==[]:
+		sys.exit("# No HLA Alleles. Exit.")
 	print str(datetime.datetime.now()),'# Searching Neoepitopes for allele types',','.join(hla_allele_list), 'with ', ','.join(epitope_len_list),'long...'
 	
 	# Step 1. Predicting the Neo-epitope by HLA binding affinity. Generating TSV and FASTA files. 
