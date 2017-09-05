@@ -54,7 +54,7 @@ def main():
 	os.system('mkdir -p '+args.sampleID)
 	sampleID = args.sampleID.rstrip('/')
 	runname = sampleID+'/hla_types'
-	bindir = '/u/home/p/panyang/Neo-Epitome/bin/seq2hla/'
+	bindir = '../../Neo-Epitome/bin/seq2hla/'
 	logging.basicConfig(level=logging.DEBUG,
 	                    format='%(asctime)s %(message)s',
 	                    filename=sampleID+'/NeoEpitome-seq2HLA.log'+ str(datetime.datetime.now())+'.txt' ,
